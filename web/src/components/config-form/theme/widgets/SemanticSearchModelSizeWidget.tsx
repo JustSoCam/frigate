@@ -2,7 +2,7 @@
 // Reads model via LiveFormDataContext so it re-runs even when RJSF's
 // SchemaField memoization would skip this widget.
 import type { WidgetProps } from "@rjsf/utils";
-import { useContext, useEffect } from "react";
+import { useContext } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Select,
@@ -24,19 +24,10 @@ export function SemanticSearchModelSizeWidget(props: WidgetProps) {
     model !== "jinav1" &&
     model !== "jinav2";
 
-  // Clear model_size while on a provider (buildOverrides converts to ""
-  // which the backend treats as "remove"). Restore the schema default
-  // when returning to a Jina model so the field isn't left empty.
-  const { value, onChange, schema } = props;
-  const schemaDefault = schema?.default as string | undefined;
-  useEffect(() => {
-    if (isProvider && value !== undefined) {
-      onChange(undefined);
-    } else if (!isProvider && value === undefined && schemaDefault) {
-      onChange(schemaDefault);
-    }
-  }, [isProvider, value, onChange, schemaDefault]);
-
+  // model_size is ignored by the backend while a provider is selected, so the
+  // field is only greyed out here. Rewriting the form data instead would leave
+  // the section permanently dirty: the effective config always reports a
+  // model_size, so the diff could never be cleared by saving.
   if (isProvider) {
     const fieldClassName = getSizedFieldClassName(props.options ?? {}, "sm");
     return (
