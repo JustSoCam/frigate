@@ -46,6 +46,25 @@ class TestUpdateYaml(unittest.TestCase):
         data = self._load()
         assert "mask" not in data["cameras"]["cam1"]["objects"]["filters"]["car"]
 
+    def test_delete_absent_key_is_noop(self):
+        """Deleting a key that was never written to yaml must not raise.
+
+        The UI diffs against the effective config, so it can ask to remove a
+        field that only ever existed as a schema default.
+        """
+        self._write("semantic_search:\n  enabled: true\n  model: llama_embed\n")
+        update_yaml_file_bulk(self.config_path, {"semantic_search.model_size": ""})
+        data = self._load()
+        assert data["semantic_search"]["model"] == "llama_embed"
+        assert "model_size" not in data["semantic_search"]
+
+    def test_delete_absent_list_index_is_noop(self):
+        """Deleting an out-of-range list index must not raise."""
+        self._write("cameras:\n  cam1:\n    motion:\n      mask:\n        - 0,0,1,1\n")
+        update_yaml_file_bulk(self.config_path, {"cameras.cam1.motion.mask.3": ""})
+        data = self._load()
+        assert data["cameras"]["cam1"]["motion"]["mask"] == ["0,0,1,1"]
+
     def test_delete_commented_key_emptying_map(self):
         """Deleting the only key of a map whose key carries comments must not
         emit unparseable yaml (orphaned comment tokens above a flow-style {})."""
