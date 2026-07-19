@@ -333,9 +333,11 @@ def update_yaml(data, key_path, new_value):
     last_key = key_path[-1]
     if new_value == "":
         if isinstance(last_key, tuple):
-            del temp[last_key[0]][last_key[1]]
-            clear_orphaned_comments(temp[last_key[0]], temp, last_key[0])
-        else:
+            sequence = temp.get(last_key[0])
+            if sequence is not None and last_key[1] < len(sequence):
+                del sequence[last_key[1]]
+                clear_orphaned_comments(sequence, temp, last_key[0])
+        elif last_key in temp:
             del temp[last_key]
             clear_orphaned_comments(temp, parent, parent_key)
     else:
