@@ -174,7 +174,7 @@
   "editLayout": {
     "label": "Edit Layout",
     "group": {
-      "label": "Edit Camera Group"
+      "label": "Edit Panel"
     },
     "exitEdit": "Exit Editing"
   },
@@ -192,9 +192,9 @@
       "buttonText": "Add Camera"
     },
     "group": {
-      "title": "No Cameras in Group",
-      "description": "This camera group has no assigned or enabled cameras.",
-      "buttonText": "Manage Groups"
+      "title": "No Cameras on Panel",
+      "description": "This panel has no available camera tiles.",
+      "buttonText": "Manage Panels"
     }
   }
 }

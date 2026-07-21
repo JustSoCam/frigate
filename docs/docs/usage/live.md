@@ -13,34 +13,39 @@ This page describes how to _use_ the Live view. For how to _configure_ live stre
 
 The default **All Cameras** dashboard shows every camera, with a filmstrip of recent **alerts** scrolling across the top. Clicking an alert opens it in [Review](/usage/review); each card also has a check button to mark it reviewed without leaving the dashboard. Only **alerts** appear in the filmstrip. To suppress a label or zone from showing there, configure it as a detection instead (see [Alerts and Detections](/configuration/review#alerts-and-detections)).
 
-By default Frigate uses **smart streaming**: a camera's image updates roughly once per minute while nothing is happening, and switches to a full live stream the moment activity is detected. This conserves bandwidth and resources. You can change this for each camera when using a camera group (see [Streaming settings](#streaming-settings-and-the-right-click-menu) below), and the behavior is explained in detail under [Live view technologies](/configuration/live#live-view-technologies).
+By default Frigate uses **smart streaming**: a camera's image updates roughly once per minute while nothing is happening, and switches to a full live stream the moment activity is detected. This conserves bandwidth and resources. You can change this for each camera on a panel (see [Streaming settings](#streaming-settings-and-the-right-click-menu) below), and the behavior is explained in detail under [Live view technologies](/configuration/live#live-view-technologies).
 
 On mobile, a toggle in the header switches between a **grid** layout and a single-column **list** layout. On desktop a **fullscreen** button is available in the lower-right corner.
 
-## Switching dashboards and camera groups
+## Switching panels
 
-The icon rail (top-left on desktop, a horizontal strip on mobile) switches between dashboards:
+The icon rail (top-left on desktop, a horizontal strip on mobile) switches between panels:
 
 - The **home** icon is the **All Cameras** dashboard, which shows every camera enabled for the dashboard.
-- Each **camera group** you create appears as its own icon. Selecting a group shows only that group's cameras.
+- Each **panel** you create appears as its own icon. A panel contains an ordered set of camera tiles with its own layout and streaming preferences.
 
-Camera groups are useful for organizing cameras by location (for example, _Front of House_ or _Backyard_) and for giving each group its own dashboard layout and camera streaming preferences.
+Panels and camera groups are separate concepts. A **panel** is a screen you arrange and monitor. A **camera group** is a reusable named collection of cameras used by filters and other camera-selection controls. A panel can include any camera more than once, including independently framed detail views of a wide camera.
 
 You can also view [Birdseye](/configuration/birdseye) on the dashboard, or open it directly at `http://<frigate_host>:5000/#birdseye`. Clicking a camera inside the Birdseye view jumps to that camera's live feed.
 
-## Creating and editing camera groups
+## Creating and editing panels
 
-Admins can manage groups from the pencil icon next to the group rail, which opens the **Camera Groups** dialog. From there you can add a group, or edit and delete existing ones. When creating a group you choose:
+Admins can manage panels from the pencil icon next to the panel rail, which opens the **Panels** dialog. From there you can add a panel, or edit and delete existing ones. When creating a panel you choose:
 
 - a **Name** (spaces are converted to underscores),
-- the **cameras** to include (each camera has a toggle and a gear that opens its [streaming settings](#streaming-settings-and-the-right-click-menu)), and
-- an **icon** used for the group's button in the rail.
+- one or more **tiles** for each camera (the plus and minus controls change the number of instances),
+- the **framing** for each tile (zoom and horizontal/vertical position),
+- an **icon** used for the panel's button in the rail.
 
-Deleting a group also clears any custom layout you saved for it.
+Adding another tile does not create another connection to the physical camera. Frigate's local stream is reused, and framing is applied as a display transform without transcoding or additional latency. Each tile still consumes browser decoding and local network resources while it is actively streaming.
 
-## Rearranging a camera group layout
+Existing camera groups automatically appear as equivalent panels until the first panel is saved. This preserves existing configurations and per-device layouts while allowing camera groups to remain available for filtering.
 
-On desktop and tablet, each camera group has its own freely-arrangeable grid. Enter **Edit Layout** mode from the layout button in the lower-right corner: camera tiles gain a drag handle and corner resize handles. Drag a tile to reposition it and drag a corner to resize it (the aspect ratio is preserved). Exit edit mode to save. The layout is stored in your browser per device, so each device can have its own arrangement.
+Deleting a panel also clears any custom layout you saved for it.
+
+## Rearranging a panel layout
+
+On desktop and tablet, each panel has its own freely-arrangeable grid. Enter **Edit Layout** mode from the layout button in the lower-right corner: camera tiles gain a drag handle and corner resize handles. Drag a tile to reposition it and drag a corner to resize it (the aspect ratio is preserved). Exit edit mode to save. The layout is stored in your browser per device, so each device can have its own arrangement.
 
 The default **All Cameras** dashboard is not manually arrangeable. It automatically sizes tiles based on each camera's aspect ratio (wide cameras span two columns, tall cameras span two rows).
 
@@ -62,7 +67,7 @@ Right-clicking (or long-pressing) a camera tile opens a context menu with quick 
 
 A **Low-bandwidth mode** notice may also appear in the context menu with a **Reset** option when Frigate has fallen back to the lower-quality jsmpeg stream. See the [Live view FAQ](/configuration/live#live-view-faq) for why this happens.
 
-For non-default groups, the context menu also exposes **Streaming Settings** for that camera, which let you choose:
+For non-default panels, the context menu also exposes **Streaming Settings** for that camera, which let you choose:
 
 - the **stream** to display (the dropdown lists the streams you configured under [`live -> streams`](/configuration/live#setting-streams-for-live-ui), and indicates whether audio is available),
 - the **streaming method**: **No Streaming**, **Smart Streaming** (recommended), or **Continuous Streaming** (higher bandwidth), and

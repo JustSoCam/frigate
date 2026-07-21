@@ -34,6 +34,7 @@ type LivePlayerProps = {
   containerRef?: React.MutableRefObject<HTMLDivElement | null>;
   className?: string;
   cameraConfig: CameraConfig;
+  visibilityKey?: string;
   streamName: string;
   preferredLiveMode: LivePlayerMode;
   showStillWithoutActivity?: boolean;
@@ -59,6 +60,7 @@ export default function LivePlayer({
   containerRef,
   className,
   cameraConfig,
+  visibilityKey,
   streamName,
   preferredLiveMode,
   showStillWithoutActivity = true,
@@ -335,7 +337,7 @@ export default function LivePlayer({
           internalContainerRef.current = node;
         }
       }}
-      data-camera={cameraConfig.name}
+      data-camera={visibilityKey ?? cameraConfig.name}
       className={cn(
         "relative flex w-full cursor-pointer justify-center outline",
         activeTracking &&

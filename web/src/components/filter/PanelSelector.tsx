@@ -1,8 +1,9 @@
 import {
   AllGroupsStreamingSettings,
-  CameraGroupConfig,
   FrigateConfig,
   GroupStreamingSettings,
+  PanelConfig,
+  PanelTileConfig,
 } from "@/types/frigateConfig";
 import { isDesktop, isMobile } from "react-device-detect";
 import useSWR from "swr";
@@ -80,7 +81,6 @@ import {
   MobilePageTitle,
 } from "../mobile/MobilePage";
 
-import { Switch } from "../ui/switch";
 import { CameraStreamingDialog } from "../settings/CameraStreamingDialog";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 import { useStreamingSettings } from "@/context/streaming-settings-provider";
@@ -90,12 +90,15 @@ import { useAllowedCameras } from "@/hooks/use-allowed-cameras";
 import { useHasFullCameraAccess } from "@/hooks/use-has-full-camera-access";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useUserPersistedOverlayState } from "@/hooks/use-overlay-state";
+import { getConfiguredPanels } from "@/utils/panelUtil";
+import AutoUpdatingCameraImage from "../camera/AutoUpdatingCameraImage";
+import { Slider } from "../ui/slider";
 
-type CameraGroupSelectorProps = {
+type PanelSelectorProps = {
   className?: string;
 };
 
-export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
+export function PanelSelector({ className }: PanelSelectorProps) {
   const { t } = useTranslation(["components/camera"]);
   const { data: config } = useSWR<FrigateConfig>("config");
   const allowedCameras = useAllowedCameras();
@@ -133,15 +136,15 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
       return [];
     }
 
-    const allGroups = Object.entries(config.camera_groups);
+    const allGroups = getConfiguredPanels(config);
 
     // If custom role, filter out groups where user has no accessible cameras
     if (!hasFullCameraAccess) {
       return allGroups
         .filter(([, groupConfig]) => {
           // Check if user has access to at least one camera in this group
-          return groupConfig.cameras.some((cameraName) =>
-            allowedCameras.includes(cameraName),
+          return groupConfig.tiles.some((tile) =>
+            allowedCameras.includes(tile.camera),
           );
         })
         .sort((a, b) => a[1].order - b[1].order);
@@ -293,7 +296,7 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
 
   return (
     <>
-      <NewGroupDialog
+      <PanelManagementDialog
         open={addGroup}
         setOpen={setAddGroup}
         currentGroups={groups}
@@ -461,16 +464,16 @@ export function CameraGroupSelector({ className }: CameraGroupSelectorProps) {
   );
 }
 
-type NewGroupDialogProps = {
+type PanelManagementDialogProps = {
   open: boolean;
   setOpen: (open: boolean) => void;
-  currentGroups: [string, CameraGroupConfig][];
+  currentGroups: [string, PanelConfig][];
   activeGroup?: string;
   setGroup: (value: string | undefined, replace?: boolean | undefined) => void;
   deleteGroup: () => void;
   isAdmin?: boolean;
 };
-function NewGroupDialog({
+function PanelManagementDialog({
   open,
   setOpen,
   currentGroups,
@@ -478,9 +481,10 @@ function NewGroupDialog({
   setGroup,
   deleteGroup,
   isAdmin,
-}: NewGroupDialogProps) {
+}: PanelManagementDialogProps) {
   const { t } = useTranslation(["components/camera"]);
-  const { mutate: updateConfig } = useSWR<FrigateConfig>("config");
+  const { data: config, mutate: updateConfig } =
+    useSWR<FrigateConfig>("config");
 
   // editing group and state
 
@@ -516,8 +520,22 @@ function NewGroupDialog({
       deleteGridLayout();
       deleteGroup();
 
-      await axios
-        .put(`config/set?camera_groups.${name}`, { requires_restart: 0 })
+      const isLegacyPanel = !config?.panels?.[name];
+      const remainingPanels = currentGroups.filter(
+        ([panelName]) => panelName !== name,
+      );
+      const request = isLegacyPanel
+        ? remainingPanels.length === 0
+          ? axios.put("config/set?panels=%7B%7D", { requires_restart: 0 })
+          : axios.put("config/set", {
+              requires_restart: 0,
+              config_data: {
+                panels: Object.fromEntries(remainingPanels),
+              },
+            })
+        : axios.put(`config/set?panels.${name}`, { requires_restart: 0 });
+
+      await request
         .then((res) => {
           if (res.status === 200) {
             if (activeGroup == name) {
@@ -564,6 +582,8 @@ function NewGroupDialog({
       setOpen,
       deleteGroup,
       deleteGridLayout,
+      config,
+      currentGroups,
       t,
     ],
   );
@@ -579,7 +599,7 @@ function NewGroupDialog({
     setEditState("none");
   };
 
-  const onEditGroup = useCallback((group: [string, CameraGroupConfig]) => {
+  const onEditGroup = useCallback((group: [string, PanelConfig]) => {
     setEditingGroupName(group[0]);
     setEditState("edit");
   }, []);
@@ -640,7 +660,7 @@ function NewGroupDialog({
               </Header>
               <div className="flex flex-col gap-4 md:gap-3">
                 {currentGroups.map((group) => (
-                  <CameraGroupRow
+                  <PanelRow
                     key={group[0]}
                     group={group}
                     onDeleteGroup={() => onDeleteGroup(group[0])}
@@ -666,7 +686,7 @@ function NewGroupDialog({
                 </Title>
                 <Description className="sr-only">{t("group.edit")}</Description>
               </Header>
-              <CameraGroupEdit
+              <PanelEdit
                 currentGroups={currentGroups}
                 editingGroup={editingGroup}
                 isLoading={isLoading}
@@ -682,18 +702,18 @@ function NewGroupDialog({
   );
 }
 
-type EditGroupDialogProps = {
+type EditPanelDialogProps = {
   open: boolean;
   setOpen: (open: boolean) => void;
-  currentGroups: [string, CameraGroupConfig][];
+  currentGroups: [string, PanelConfig][];
   activeGroup?: string;
 };
-export function EditGroupDialog({
+export function EditPanelDialog({
   open,
   setOpen,
   currentGroups,
   activeGroup,
-}: EditGroupDialogProps) {
+}: EditPanelDialogProps) {
   const { t } = useTranslation(["components/camera"]);
   const Overlay = isDesktop ? Dialog : MobilePage;
   const Content = isDesktop ? DialogContent : MobilePageContent;
@@ -738,7 +758,7 @@ export function EditGroupDialog({
               <Description className="sr-only">{t("group.edit")}</Description>
             </Header>
 
-            <CameraGroupEdit
+            <PanelEdit
               currentGroups={currentGroups}
               editingGroup={editingGroup}
               isLoading={isLoading}
@@ -753,19 +773,19 @@ export function EditGroupDialog({
   );
 }
 
-type CameraGroupRowProps = {
-  group: [string, CameraGroupConfig];
+type PanelRowProps = {
+  group: [string, PanelConfig];
   onDeleteGroup: () => void;
   onEditGroup: () => void;
   isReadOnly?: boolean;
 };
 
-export function CameraGroupRow({
+export function PanelRow({
   group,
   onDeleteGroup,
   onEditGroup,
   isReadOnly,
-}: CameraGroupRowProps) {
+}: PanelRowProps) {
   const { t } = useTranslation(["components/camera"]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -870,23 +890,23 @@ export function CameraGroupRow({
   );
 }
 
-type CameraGroupEditProps = {
-  currentGroups: [string, CameraGroupConfig][];
-  editingGroup?: [string, CameraGroupConfig];
+type PanelEditProps = {
+  currentGroups: [string, PanelConfig][];
+  editingGroup?: [string, PanelConfig];
   isLoading: boolean;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   onSave?: () => void;
   onCancel?: () => void;
 };
 
-export function CameraGroupEdit({
+export function PanelEdit({
   currentGroups,
   editingGroup,
   isLoading,
   setIsLoading,
   onSave,
   onCancel,
-}: CameraGroupEditProps) {
+}: PanelEditProps) {
   const { t } = useTranslation(["components/camera"]);
   const { data: config, mutate: updateConfig } =
     useSWR<FrigateConfig>("config");
@@ -903,6 +923,7 @@ export function CameraGroupEdit({
   const hasFullCameraAccess = useHasFullCameraAccess();
 
   const [openCamera, setOpenCamera] = useState<string | null>();
+  const [editingTileId, setEditingTileId] = useState<string | null>(null);
 
   const birdseyeConfig = useMemo(() => config?.birdseye, [config]);
 
@@ -937,7 +958,13 @@ export function CameraGroupEdit({
         message: t("group.name.errorMessage.invalid"),
       }),
 
-    cameras: z.array(z.string()),
+    tiles: z.array(
+      z.object({
+        id: z.string(),
+        camera: z.string(),
+        crop: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+      }),
+    ),
     icon: z
       .string()
       .min(1, { message: "You must select an icon." })
@@ -964,29 +991,39 @@ export function CameraGroupEdit({
         [values.name]: groupStreamingSettings,
       };
 
-      let renamingQuery = "";
-      if (editingGroup && editingGroup[0] !== values.name) {
-        renamingQuery = `camera_groups.${editingGroup[0]}&`;
-      }
-
       const order =
         editingGroup === undefined
           ? currentGroups.length + 1
           : editingGroup[1].order;
 
-      const orderQuery = `camera_groups.${values.name}.order=${+order}`;
-      const iconQuery = `camera_groups.${values.name}.icon=${values.icon}`;
-      const cameraQueries = values.cameras
-        .map((cam) => `&camera_groups.${values.name}.cameras=${cam}`)
-        .join("");
+      const panelConfig: PanelConfig = {
+        order,
+        icon: values.icon as IconName,
+        tiles: values.tiles,
+      };
+      const migratingPanels = currentGroups.filter(
+        ([panelName]) =>
+          !editingGroup ||
+          editingGroup[0] === values.name ||
+          panelName !== editingGroup[0],
+      );
+      const panels: Record<string, PanelConfig | null> = {
+        ...(config?.panels == null ? Object.fromEntries(migratingPanels) : {}),
+        [values.name]: panelConfig,
+      };
+      if (
+        editingGroup &&
+        editingGroup[0] !== values.name &&
+        config?.panels?.[editingGroup[0]]
+      ) {
+        panels[editingGroup[0]] = null;
+      }
 
       axios
-        .put(
-          `config/set?${renamingQuery}${orderQuery}&${iconQuery}${cameraQueries}`,
-          {
-            requires_restart: 0,
-          },
-        )
+        .put("config/set", {
+          requires_restart: 0,
+          config_data: { panels },
+        })
         .then(async (res) => {
           if (res.status === 200) {
             toast.success(
@@ -1040,6 +1077,7 @@ export function CameraGroupEdit({
       groupStreamingSettings,
       allGroupsStreamingSettings,
       setAllGroupsStreamingSettings,
+      config,
       t,
     ],
   );
@@ -1050,7 +1088,7 @@ export function CameraGroupEdit({
     defaultValues: {
       name: (editingGroup && editingGroup[0]) ?? "",
       icon: editingGroup && (editingGroup[1].icon as IconName),
-      cameras: editingGroup && editingGroup[1].cameras,
+      tiles: editingGroup?.[1].tiles ?? [],
     },
   });
 
@@ -1082,7 +1120,7 @@ export function CameraGroupEdit({
         <div className="scrollbar-container max-h-[40dvh] overflow-y-auto">
           <FormField
             control={form.control}
-            name="cameras"
+            name="tiles"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>{t("group.cameras.label")}</FormLabel>
@@ -1099,69 +1137,161 @@ export function CameraGroupEdit({
                         (config?.cameras[a]?.ui?.order ?? 0) -
                         (config?.cameras[b]?.ui?.order ?? 0),
                     ),
-                ].map((camera) => (
-                  <FormControl key={camera}>
-                    <div className="flex items-center justify-between gap-1">
-                      <CameraNameLabel
-                        className="mx-2 w-full cursor-pointer text-primary smart-capitalize"
-                        htmlFor={camera.replaceAll("_", " ")}
-                        camera={camera}
-                      />
+                ].map((camera) => {
+                  const cameraTiles = (field.value ?? []).filter(
+                    (tile) => tile.camera === camera,
+                  );
+                  return (
+                    <FormControl key={camera}>
+                      <div>
+                        <div className="flex min-h-10 items-center justify-between gap-1">
+                          <CameraNameLabel
+                            className="mx-2 w-full text-primary smart-capitalize"
+                            htmlFor={camera.replaceAll("_", " ")}
+                            camera={camera}
+                          />
 
-                      <div className="flex items-center gap-x-2">
-                        {camera !== "birdseye" && (
-                          <Dialog
-                            open={openCamera === camera}
-                            onOpenChange={(isOpen) =>
-                              setOpenCamera(isOpen ? camera : null)
-                            }
-                          >
-                            <DialogTrigger asChild>
-                              <Button
-                                className="flex h-auto items-center gap-1"
-                                aria-label={t("group.camera.setting.label")}
-                                size="icon"
-                                variant="ghost"
-                                disabled={
-                                  !(field.value && field.value.includes(camera))
+                          <div className="flex items-center gap-x-2">
+                            {camera !== "birdseye" && (
+                              <Dialog
+                                open={openCamera === camera}
+                                onOpenChange={(isOpen) =>
+                                  setOpenCamera(isOpen ? camera : null)
                                 }
                               >
-                                <LuIcons.LuSettings
-                                  className={cn(
-                                    field.value && field.value.includes(camera)
-                                      ? "text-primary"
-                                      : "text-muted-foreground",
-                                    "size-5",
-                                  )}
+                                <DialogTrigger asChild>
+                                  <Button
+                                    className="flex h-auto items-center gap-1"
+                                    aria-label={t("group.camera.setting.label")}
+                                    size="icon"
+                                    variant="ghost"
+                                    disabled={cameraTiles.length === 0}
+                                  >
+                                    <LuIcons.LuSettings
+                                      className={cn(
+                                        cameraTiles.length > 0
+                                          ? "text-primary"
+                                          : "text-muted-foreground",
+                                        "size-5",
+                                      )}
+                                    />
+                                  </Button>
+                                </DialogTrigger>
+                                <CameraStreamingDialog
+                                  camera={camera}
+                                  groupStreamingSettings={
+                                    groupStreamingSettings
+                                  }
+                                  setGroupStreamingSettings={
+                                    setGroupStreamingSettings
+                                  }
+                                  setIsDialogOpen={(isOpen) =>
+                                    setOpenCamera(isOpen ? camera : null)
+                                  }
                                 />
+                              </Dialog>
+                            )}
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              disabled={cameraTiles.length === 0}
+                              aria-label={t("group.camera.removeTile")}
+                              onClick={() => {
+                                const lastTile = cameraTiles.at(-1);
+                                field.onChange(
+                                  (field.value ?? []).filter(
+                                    (tile) => tile.id !== lastTile?.id,
+                                  ),
+                                );
+                              }}
+                            >
+                              <LuIcons.LuMinus className="size-4" />
+                            </Button>
+                            <span
+                              className="w-6 text-center text-sm tabular-nums"
+                              aria-label={`${t("group.camera.tileCount")}: ${cameraTiles.length}`}
+                            >
+                              {cameraTiles.length}
+                            </span>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              aria-label={t("group.camera.addTile")}
+                              onClick={() => {
+                                const tile: PanelTileConfig = {
+                                  id: `${camera}-${crypto.randomUUID()}`,
+                                  camera,
+                                  crop: [0, 0, 1, 1],
+                                };
+                                field.onChange([...(field.value ?? []), tile]);
+                              }}
+                            >
+                              <LuIcons.LuPlus className="size-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        {cameraTiles.map((tile, index) => (
+                          <div
+                            key={tile.id}
+                            className="ml-8 flex min-h-9 items-center justify-between border-l border-secondary pl-3"
+                          >
+                            <span className="text-sm text-muted-foreground">
+                              {t("group.camera.tileLabel", {
+                                number: index + 1,
+                              })}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {camera !== "birdseye" && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingTileId(tile.id)}
+                                >
+                                  <LuIcons.LuScan className="mr-2 size-4" />
+                                  {t("group.camera.crop.label")}
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                aria-label={t("group.camera.removeTile")}
+                                onClick={() =>
+                                  field.onChange(
+                                    (field.value ?? []).filter(
+                                      (candidate) => candidate.id !== tile.id,
+                                    ),
+                                  )
+                                }
+                              >
+                                <HiTrash className="size-4" />
                               </Button>
-                            </DialogTrigger>
-                            <CameraStreamingDialog
-                              camera={camera}
-                              groupStreamingSettings={groupStreamingSettings}
-                              setGroupStreamingSettings={
-                                setGroupStreamingSettings
+                            </div>
+                            <PanelTileCropDialog
+                              open={editingTileId === tile.id}
+                              setOpen={(open) =>
+                                setEditingTileId(open ? tile.id : null)
                               }
-                              setIsDialogOpen={(isOpen) =>
-                                setOpenCamera(isOpen ? camera : null)
+                              tile={tile}
+                              onChange={(updatedTile) =>
+                                field.onChange(
+                                  (field.value ?? []).map((candidate) =>
+                                    candidate.id === updatedTile.id
+                                      ? updatedTile
+                                      : candidate,
+                                  ),
+                                )
                               }
                             />
-                          </Dialog>
-                        )}
-                        <Switch
-                          id={camera.replaceAll("_", " ")}
-                          checked={field.value && field.value.includes(camera)}
-                          onCheckedChange={(checked) => {
-                            const updatedCameras = checked
-                              ? [...(field.value || []), camera]
-                              : (field.value || []).filter((c) => c !== camera);
-                            form.setValue("cameras", updatedCameras);
-                          }}
-                        />
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  </FormControl>
-                ))}
+                    </FormControl>
+                  );
+                })}
               </FormItem>
             )}
           />
@@ -1220,5 +1350,139 @@ export function CameraGroupEdit({
         </DialogFooter>
       </form>
     </Form>
+  );
+}
+
+type PanelTileCropDialogProps = {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  tile: PanelTileConfig;
+  onChange: (tile: PanelTileConfig) => void;
+};
+
+function PanelTileCropDialog({
+  open,
+  setOpen,
+  tile,
+  onChange,
+}: PanelTileCropDialogProps) {
+  const { t } = useTranslation(["components/camera"]);
+  const [left, top, right, bottom] = tile.crop;
+  const cropWidth = right - left;
+  const cropHeight = bottom - top;
+  const zoom = 1 / cropWidth;
+  const centerX = left + cropWidth / 2;
+  const centerY = top + cropHeight / 2;
+
+  const updateCrop = useCallback(
+    (nextZoom: number, nextCenterX: number, nextCenterY: number) => {
+      const width = 1 / nextZoom;
+      const height = 1 / nextZoom;
+      const halfWidth = width / 2;
+      const halfHeight = height / 2;
+      const clampedCenterX = Math.min(
+        1 - halfWidth,
+        Math.max(halfWidth, nextCenterX),
+      );
+      const clampedCenterY = Math.min(
+        1 - halfHeight,
+        Math.max(halfHeight, nextCenterY),
+      );
+
+      onChange({
+        ...tile,
+        crop: [
+          clampedCenterX - halfWidth,
+          clampedCenterY - halfHeight,
+          clampedCenterX + halfWidth,
+          clampedCenterY + halfHeight,
+        ],
+      });
+    },
+    [onChange, tile],
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("group.camera.crop.title")}</DialogTitle>
+          <DialogDescription>{t("group.camera.crop.desc")}</DialogDescription>
+        </DialogHeader>
+
+        <div className="relative aspect-video overflow-hidden rounded-lg bg-black">
+          <div
+            className="absolute"
+            style={{
+              left: `${(-left / cropWidth) * 100}%`,
+              top: `${(-top / cropHeight) * 100}%`,
+              width: `${100 / cropWidth}%`,
+              height: `${100 / cropHeight}%`,
+            }}
+          >
+            <AutoUpdatingCameraImage
+              camera={tile.camera}
+              className="size-full"
+              cameraClasses="size-full object-cover"
+              reloadInterval={1000}
+              showFps={false}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>{t("group.camera.crop.zoom")}</span>
+              <span className="tabular-nums">{zoom.toFixed(1)}×</span>
+            </div>
+            <Slider
+              min={1}
+              max={8}
+              step={0.1}
+              value={[zoom]}
+              onValueChange={([value]) => updateCrop(value, centerX, centerY)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-sm">{t("group.camera.crop.horizontal")}</span>
+            <Slider
+              min={cropWidth / 2}
+              max={1 - cropWidth / 2}
+              step={0.01}
+              disabled={zoom === 1}
+              value={[centerX]}
+              onValueChange={([value]) => updateCrop(zoom, value, centerY)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-sm">{t("group.camera.crop.vertical")}</span>
+            <Slider
+              min={cropHeight / 2}
+              max={1 - cropHeight / 2}
+              step={0.01}
+              disabled={zoom === 1}
+              value={[centerY]}
+              onValueChange={([value]) => updateCrop(zoom, centerX, value)}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => updateCrop(1, 0.5, 0.5)}
+          >
+            {t("group.camera.crop.reset")}
+          </Button>
+          <Button type="button" onClick={() => setOpen(false)}>
+            {t("button.done", { ns: "common" })}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

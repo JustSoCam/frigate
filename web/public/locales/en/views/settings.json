@@ -171,12 +171,12 @@
     },
     "storedLayouts": {
       "title": "Stored Layouts",
-      "desc": "The layout of cameras in a camera group can be dragged/resized. The positions are stored in your browser's local storage.",
+      "desc": "Camera tiles on a panel can be dragged and resized. Their positions are stored in your browser's local storage.",
       "clearAll": "Clear All Layouts"
     },
     "cameraGroupStreaming": {
-      "title": "Camera Group Streaming Settings",
-      "desc": "Streaming settings for each camera group are stored in your browser's local storage.",
+      "title": "Panel Streaming Settings",
+      "desc": "Streaming settings for each panel are stored in your browser's local storage.",
       "clearAll": "Clear All Streaming Settings"
     },
     "recordingsViewer": {
@@ -198,7 +198,7 @@
     "toast": {
       "success": {
         "clearStoredLayout": "Cleared stored layout for {{cameraName}}",
-        "clearStreamingSettings": "Cleared streaming settings for all camera groups."
+        "clearStreamingSettings": "Cleared streaming settings for all panels."
       },
       "error": {
         "clearStoredLayoutFailed": "Failed to clear stored layout: {{errorMessage}}",

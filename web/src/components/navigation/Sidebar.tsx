@@ -1,6 +1,6 @@
 import Logo from "../Logo";
 import NavItem from "./NavItem";
-import { CameraGroupSelector } from "../filter/CameraGroupSelector";
+import { PanelSelector } from "../filter/PanelSelector";
 import { Link, useMatch } from "react-router-dom";
 import GeneralSettings from "../menu/GeneralSettings";
 import AccountSettings from "../menu/AccountSettings";
@@ -24,17 +24,16 @@ function Sidebar() {
           <Logo className="mb-6 h-8 w-8" />
         </Link>
         {navbarLinks.map((item) => {
-          const showCameraGroups =
-            (isRootMatch || isBasePathMatch) && item.id === 1;
+          const showPanels = (isRootMatch || isBasePathMatch) && item.id === 1;
 
           return (
             <div key={item.id}>
               <NavItem
-                className={`mx-[10px] ${showCameraGroups ? "mb-2" : "mb-4"}`}
+                className={`mx-[10px] ${showPanels ? "mb-2" : "mb-4"}`}
                 item={item}
                 Icon={item.icon}
               />
-              {showCameraGroups && <CameraGroupSelector className="mb-4" />}
+              {showPanels && <PanelSelector className="mb-4" />}
             </div>
           );
         })}

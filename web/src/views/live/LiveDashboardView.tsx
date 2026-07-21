@@ -1,10 +1,11 @@
 import { useFrigateReviews } from "@/api/ws";
 import Logo from "@/components/Logo";
-import { CameraGroupSelector } from "@/components/filter/CameraGroupSelector";
+import { PanelSelector } from "@/components/filter/PanelSelector";
 import { LiveGridIcon, LiveListIcon } from "@/components/icons/LiveIcons";
 import { AnimatedEventCard } from "@/components/card/AnimatedEventCard";
 import BirdseyeLivePlayer from "@/components/player/BirdseyeLivePlayer";
 import LivePlayer from "@/components/player/LivePlayer";
+import PanelCropFrame from "@/components/player/PanelCropFrame";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
@@ -19,6 +20,7 @@ import {
   AllGroupsStreamingSettings,
   CameraConfig,
   FrigateConfig,
+  PanelTileConfig,
 } from "@/types/frigateConfig";
 import { ReviewSegment } from "@/types/review";
 import {
@@ -60,6 +62,7 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 type LiveDashboardViewProps = {
   cameras: CameraConfig[];
   cameraGroup: string;
+  panelTiles?: PanelTileConfig[];
   includeBirdseye: boolean;
   onSelectCamera: (camera: string) => void;
   fullscreen: boolean;
@@ -68,6 +71,7 @@ type LiveDashboardViewProps = {
 export default function LiveDashboardView({
   cameras,
   cameraGroup,
+  panelTiles,
   includeBirdseye,
   onSelectCamera,
   fullscreen,
@@ -114,11 +118,18 @@ export default function LiveDashboardView({
         .join(",");
     }
 
-    return cameras
-      .map((cam) => cam.name)
-      .filter((cam) => config.camera_groups[cameraGroup]?.cameras.includes(cam))
+    return [...new Set(panelTiles?.map((tile) => tile.camera) ?? [])]
+      .filter((camera) => camera !== "birdseye")
+      .filter((camera) => allowedCameras.includes(camera))
       .join(",");
-  }, [cameras, cameraGroup, config, includeBirdseye, allowedCameras]);
+  }, [
+    cameras,
+    cameraGroup,
+    config,
+    includeBirdseye,
+    allowedCameras,
+    panelTiles,
+  ]);
 
   const { data: allEvents, mutate: updateEvents } = useSWR<ReviewSegment[]>([
     "review",
@@ -282,6 +293,30 @@ export default function LiveDashboardView({
 
   const birdseyeConfig = useMemo(() => config?.birdseye, [config]);
 
+  const dashboardTiles = useMemo(() => {
+    if (cameraGroup != "default" && panelTiles) {
+      return panelTiles.flatMap((tile) => {
+        if (tile.camera == "birdseye") {
+          return [];
+        }
+
+        const camera = cameras.find(
+          (candidate) => candidate.name == tile.camera,
+        );
+        return camera ? [{ tile, camera }] : [];
+      });
+    }
+
+    return cameras.map((camera) => ({
+      tile: {
+        id: camera.name,
+        camera: camera.name,
+        crop: [0, 0, 1, 1] as [number, number, number, number],
+      },
+      camera,
+    }));
+  }, [cameraGroup, cameras, panelTiles]);
+
   const handleError = useCallback(
     (cameraName: string, error: LivePlayerError) => {
       setPreferredLiveModes((prevModes) => {
@@ -405,7 +440,7 @@ export default function LiveDashboardView({
         <div className="relative flex h-11 items-center justify-between">
           <Logo className="absolute inset-x-1/2 h-8 -translate-x-1/2" />
           <div className="w-[45%]">
-            <CameraGroupSelector />
+            <PanelSelector />
           </div>
           {(!cameraGroup || cameraGroup == "default" || isMobileOnly) && (
             <div className="flex items-center gap-1">
@@ -521,10 +556,13 @@ export default function LiveDashboardView({
                     />
                   </div>
                 )}
-                {cameras.map((camera) => {
+                {dashboardTiles.map(({ tile, camera }) => {
                   let grow;
+                  const cropWidth = tile.crop[2] - tile.crop[0];
+                  const cropHeight = tile.crop[3] - tile.crop[1];
                   const aspectRatio =
-                    camera.detect.width / camera.detect.height;
+                    (camera.detect.width / camera.detect.height) *
+                    (cropWidth / cropHeight);
                   if (aspectRatio > 2) {
                     grow = `${mobileLayout == "grid" && "col-span-2"} aspect-wide`;
                   } else if (aspectRatio < 1) {
@@ -563,7 +601,7 @@ export default function LiveDashboardView({
                   return (
                     <LiveContextMenu
                       className={grow}
-                      key={camera.name}
+                      key={tile.id}
                       camera={camera.name}
                       cameraGroup={cameraGroup}
                       streamName={streamName}
@@ -594,34 +632,39 @@ export default function LiveDashboardView({
                       config={config}
                       streamMetadata={streamMetadata}
                     >
-                      <LivePlayer
-                        cameraRef={cameraRef}
-                        key={camera.name}
+                      <PanelCropFrame
+                        crop={tile.crop}
                         className={`${grow} rounded-lg bg-black md:rounded-2xl`}
-                        windowVisible={
-                          windowVisible && visibleCameras.includes(camera.name)
-                        }
-                        cameraConfig={camera}
-                        preferredLiveMode={
-                          preferredLiveModes[camera.name] ?? "mse"
-                        }
-                        autoLive={autoLive ?? globalAutoLive}
-                        showStillWithoutActivity={
-                          showStillWithoutActivity ?? true
-                        }
-                        alwaysShowCameraName={displayCameraNames}
-                        useWebGL={useWebGL}
-                        playInBackground={false}
-                        showStats={statsStates[camera.name]}
-                        streamName={streamName}
-                        onClick={() => onSelectCamera(camera.name)}
-                        onError={(e) => handleError(camera.name, e)}
-                        onResetLiveMode={() =>
-                          resetPreferredLiveMode(camera.name)
-                        }
-                        playAudio={audioStates[camera.name] ?? false}
-                        volume={volumeStates[camera.name]}
-                      />
+                      >
+                        <LivePlayer
+                          cameraRef={cameraRef}
+                          visibilityKey={tile.id}
+                          className="size-full bg-black"
+                          windowVisible={
+                            windowVisible && visibleCameras.includes(tile.id)
+                          }
+                          cameraConfig={camera}
+                          preferredLiveMode={
+                            preferredLiveModes[camera.name] ?? "mse"
+                          }
+                          autoLive={autoLive ?? globalAutoLive}
+                          showStillWithoutActivity={
+                            showStillWithoutActivity ?? true
+                          }
+                          alwaysShowCameraName={displayCameraNames}
+                          useWebGL={useWebGL}
+                          playInBackground={false}
+                          showStats={statsStates[camera.name]}
+                          streamName={streamName}
+                          onClick={() => onSelectCamera(camera.name)}
+                          onError={(e) => handleError(camera.name, e)}
+                          onResetLiveMode={() =>
+                            resetPreferredLiveMode(camera.name)
+                          }
+                          playAudio={audioStates[camera.name] ?? false}
+                          volume={volumeStates[camera.name]}
+                        />
+                      </PanelCropFrame>
                     </LiveContextMenu>
                   );
                 })}
@@ -661,6 +704,7 @@ export default function LiveDashboardView({
           ) : (
             <DraggableGridLayout
               cameras={cameras}
+              panelTiles={panelTiles ?? []}
               cameraGroup={cameraGroup}
               containerRef={containerRef}
               cameraRef={cameraRef}

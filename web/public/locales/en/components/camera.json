@@ -1,40 +1,53 @@
 {
   "group": {
-    "label": "Camera Groups",
-    "add": "Add Camera Group",
-    "showAll": "Show all camera groups",
+    "label": "Panels",
+    "add": "Add Panel",
+    "showAll": "Show all panels",
     "showLess": "Show less",
-    "edit": "Edit Camera Group",
-    "editGroups": "Edit Camera Groups",
+    "edit": "Edit Panel",
+    "editGroups": "Edit Panels",
     "delete": {
-      "label": "Delete Camera Group",
+      "label": "Delete Panel",
       "confirm": {
         "title": "Confirm Delete",
-        "desc": "Are you sure you want to delete the camera group <em>{{name}}</em>?"
+        "desc": "Are you sure you want to delete the panel <em>{{name}}</em>?"
       }
     },
     "name": {
       "label": "Name",
       "placeholder": "Enter a name…",
       "errorMessage": {
-        "mustLeastCharacters": "Camera group name must be at least 2 characters.",
-        "exists": "Camera group name already exists.",
-        "nameMustNotPeriod": "Camera group name must not contain a period.",
-        "invalid": "Invalid camera group name."
+        "mustLeastCharacters": "Panel name must be at least 2 characters.",
+        "exists": "Panel name already exists.",
+        "nameMustNotPeriod": "Panel name must not contain a period.",
+        "invalid": "Invalid panel name."
       }
     },
     "cameras": {
-      "label": "Cameras",
-      "desc": "Select cameras for this group."
+      "label": "Panel tiles",
+      "desc": "Add one or more tiles from each camera. A camera can appear more than once."
     },
     "icon": "Icon",
-    "success": "Camera group ({{name}}) has been saved.",
+    "success": "Panel ({{name}}) has been saved.",
     "camera": {
       "birdseye": "Birdseye",
+      "addTile": "Add camera tile",
+      "removeTile": "Remove camera tile",
+      "tileCount": "Camera tile count",
+      "tileLabel": "View {{number}}",
+      "crop": {
+        "label": "Frame",
+        "title": "Frame camera tile",
+        "desc": "Zoom and position this tile without changing the camera stream.",
+        "zoom": "Zoom",
+        "horizontal": "Horizontal position",
+        "vertical": "Vertical position",
+        "reset": "Reset framing"
+      },
       "setting": {
         "label": "Camera Streaming Settings",
         "title": "{{cameraName}} Streaming Settings",
-        "desc": "Change the live streaming options for this camera group's dashboard. <em>These settings are device/browser-specific.</em>",
+        "desc": "Change the live streaming options for this camera on the panel. <em>These settings are device/browser-specific.</em>",
         "audioIsAvailable": "Audio is available for this stream",
         "audioIsUnavailable": "Audio is unavailable for this stream",
         "audio": {

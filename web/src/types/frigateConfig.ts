@@ -344,6 +344,18 @@ export type CameraGroupConfig = {
   order: number;
 };
 
+export type PanelTileConfig = {
+  id: string;
+  camera: string;
+  crop: [number, number, number, number];
+};
+
+export type PanelConfig = {
+  tiles: PanelTileConfig[];
+  icon: IconName;
+  order: number;
+};
+
 export type StreamType = "no-streaming" | "smart" | "continuous";
 
 export type CameraStreamingSettings = {
@@ -500,6 +512,7 @@ export interface FrigateConfig {
   };
 
   camera_groups: { [groupName: string]: CameraGroupConfig };
+  panels: { [panelName: string]: PanelConfig } | null;
 
   profiles: { [profileName: string]: ProfileDefinitionConfig };
 

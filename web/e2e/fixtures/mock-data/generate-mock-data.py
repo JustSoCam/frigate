@@ -14,6 +14,7 @@ Strategy:
 """
 
 import json
+import os
 import sys
 import time
 import warnings
@@ -23,7 +24,8 @@ from pathlib import Path
 warnings.filterwarnings("ignore")
 
 OUTPUT_DIR = Path(__file__).parent
-NOW = time.time()
+REPO_ROOT = Path(__file__).resolve().parents[4]
+NOW = float(os.environ.get("FRIGATE_E2E_FIXTURE_TIME", time.time()))
 HOUR = 3600
 
 CAMERAS = ["front_door", "backyard", "garage"]
@@ -47,7 +49,7 @@ def check_pydantic_fields(pydantic_class, mock_keys, model_name):
             file=sys.stderr,
         )
         print(
-            f"  Add these fields to the mock data in this script.",
+            "  Add these fields to the mock data in this script.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -67,12 +69,18 @@ def generate_config():
         json.dumps(
             {
                 "mqtt": {"host": "mqtt"},
+                "model": {
+                    "labelmap_path": str(REPO_ROOT / "labelmap.txt"),
+                },
+                "ffmpeg": {
+                    "hwaccel_args": "preset-vaapi",
+                },
                 "cameras": {
                     cam: {
                         "ffmpeg": {
                             "inputs": [
                                 {
-                                    "path": f"rtsp://10.0.0.{i+1}:554/video",
+                                    "path": f"rtsp://10.0.0.{i + 1}:554/video",
                                     "roles": ["detect"],
                                 }
                             ]
@@ -107,6 +115,8 @@ def generate_config():
         all_attrs.update(attrs)
     snapshot["model"]["all_attributes"] = sorted(all_attrs)
     snapshot["model"]["colormap"] = {}
+    snapshot["model"]["labelmap_path"] = None
+    snapshot["detectors"]["cpu"]["model"]["labelmap_path"] = None
 
     return snapshot
 
@@ -209,9 +219,7 @@ def generate_reviews():
     result = [r.model_dump(mode="json") for r in reviews]
 
     # Verify mock data covers all Pydantic response model fields
-    check_pydantic_fields(
-        ReviewSegmentResponse, set(result[0].keys()), "ReviewSegment"
-    )
+    check_pydantic_fields(ReviewSegmentResponse, set(result[0].keys()), "ReviewSegment")
 
     return result
 
@@ -390,8 +398,9 @@ def generate_cases():
 
 def generate_review_summary():
     """Generate ReviewSummary for the calendar filter."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    fixture_now = datetime.fromtimestamp(NOW)
+    today = fixture_now.strftime("%Y-%m-%d")
+    yesterday = (fixture_now - timedelta(days=1)).strftime("%Y-%m-%d")
 
     return {
         today: {

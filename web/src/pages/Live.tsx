@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef } from "react";
 import useSWR from "swr";
 import { useAllowedCameras } from "@/hooks/use-allowed-cameras";
 import { useHasFullCameraAccess } from "@/hooks/use-has-full-camera-access";
+import { getPanel } from "@/utils/panelUtil";
 
 function Live() {
   const { t } = useTranslation(["views/live"]);
@@ -28,7 +29,7 @@ function Live() {
 
   useSearchEffect("group", (cameraGroup) => {
     if (config && cameraGroup && loaded) {
-      const group = config.camera_groups[cameraGroup];
+      const group = getPanel(config, cameraGroup);
 
       if (group) {
         setCameraGroup(cameraGroup);
@@ -95,14 +96,12 @@ function Live() {
       return false;
     }
 
-    if (
-      config &&
-      Object.keys(config.camera_groups).length &&
-      cameraGroup &&
-      config.camera_groups[cameraGroup] &&
-      cameraGroup != "default"
-    ) {
-      return config.camera_groups[cameraGroup].cameras.includes("birdseye");
+    if (config && cameraGroup && cameraGroup != "default") {
+      return (
+        getPanel(config, cameraGroup)?.tiles.some(
+          (tile) => tile.camera === "birdseye",
+        ) ?? false
+      );
     } else {
       return false;
     }
@@ -113,19 +112,22 @@ function Live() {
       return [];
     }
 
-    if (
-      Object.keys(config.camera_groups).length &&
-      cameraGroup &&
-      config.camera_groups[cameraGroup] &&
-      cameraGroup != "default"
-    ) {
-      const group = config.camera_groups[cameraGroup];
+    if (cameraGroup && cameraGroup != "default") {
+      const panel = getPanel(config, cameraGroup);
+      const panelCameraNames = new Set(
+        panel?.tiles.map((tile) => tile.camera) ?? [],
+      );
       return Object.values(config.cameras)
         .filter(
-          (conf) => conf.enabled_in_config && group.cameras.includes(conf.name),
+          (conf) => conf.enabled_in_config && panelCameraNames.has(conf.name),
         )
         .filter((cam) => allowedCameras.includes(cam.name))
-        .sort((aConf, bConf) => aConf.ui.order - bConf.ui.order);
+        .sort(
+          (aConf, bConf) =>
+            (panel?.tiles.findIndex((tile) => tile.camera === aConf.name) ??
+              0) -
+            (panel?.tiles.findIndex((tile) => tile.camera === bConf.name) ?? 0),
+        );
     }
 
     return Object.values(config.cameras)
@@ -173,6 +175,11 @@ function Live() {
         <LiveDashboardView
           cameras={cameras}
           cameraGroup={cameraGroup ?? "default"}
+          panelTiles={
+            config && cameraGroup !== "default"
+              ? getPanel(config, cameraGroup)?.tiles
+              : undefined
+          }
           includeBirdseye={includesBirdseye}
           onSelectCamera={setSelectedCameraName}
           fullscreen={fullscreen}

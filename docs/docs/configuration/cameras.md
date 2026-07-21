@@ -189,12 +189,12 @@ The FeatureList on the [ONVIF Conformant Products Database](https://www.onvif.or
 
 ## Setting up camera groups
 
-Camera groups let you organize cameras together with a shared name and icon, making it easier to review and filter them. A default group for all cameras is always available.
+Camera groups let you organize cameras together under a shared name, making it easier to select them in review, search, export, and other filters.
 
 <ConfigTabs>
 <TabItem value="ui">
 
-On the Live dashboard, press the **pencil icon** in the main navigation to add a new camera group. Configure the group name, select which cameras to include, choose an icon, and set the display order.
+Camera groups can be configured in YAML. Live monitoring screens are configured separately as [panels](/usage/live#creating-and-editing-panels).
 
 </TabItem>
 <TabItem value="yaml">
@@ -208,6 +208,37 @@ camera_groups:
     icon: LuCar
     order: 0
 ```
+
+</TabItem>
+</ConfigTabs>
+
+## Setting up panels
+
+Panels are the configurable monitoring screens in Live view. A panel contains tile instances rather than only camera names, so the same camera can appear more than once with different framing.
+
+<ConfigTabs>
+<TabItem value="ui">
+
+On the Live dashboard, press the **pencil icon** in the main navigation to add or edit a panel. Use the plus button to add camera tiles, then use **Frame** on any tile to set its zoom and position.
+
+</TabItem>
+<TabItem value="yaml">
+
+```yaml
+panels:
+  front:
+    icon: LuCar
+    order: 0
+    tiles:
+      - id: driveway_wide
+        camera: driveway_cam
+        crop: [0, 0, 1, 1]
+      - id: driveway_gate
+        camera: driveway_cam
+        crop: [0.5, 0.2, 1, 0.7]
+```
+
+Crop coordinates are normalized `[left, top, right, bottom]` values from `0` to `1`.
 
 </TabItem>
 </ConfigTabs>

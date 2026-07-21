@@ -67,6 +67,7 @@ from .env import EnvVars
 from .logger import LoggerConfig
 from .mqtt import MqttConfig
 from .network import NetworkingConfig
+from .panel import PanelConfig
 from .profile import ProfileDefinitionConfig
 from .proxy import ProxyConfig
 from .telemetry import TelemetryConfig
@@ -605,6 +606,15 @@ class FrigateConfig(FrigateBaseModel):
         default_factory=dict,
         title="Camera groups",
         description="Configuration for named camera groups used to organize cameras in the UI.",
+    )
+
+    panels: dict[str, PanelConfig] | None = Field(
+        default=None,
+        title="Panels",
+        description=(
+            "Named Live view panels containing independently framed camera tiles. "
+            "When unset, legacy camera groups are shown as panels."
+        ),
     )
 
     profiles: dict[str, ProfileDefinitionConfig] = Field(

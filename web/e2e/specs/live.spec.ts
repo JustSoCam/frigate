@@ -29,6 +29,42 @@ test.describe("Live Dashboard @critical", () => {
     }
   });
 
+  test("a panel renders duplicate framings of the same camera", async ({
+    frigateApp,
+  }) => {
+    await frigateApp.api.install({
+      config: {
+        panels: {
+          detail: {
+            icon: "generic",
+            order: 0,
+            tiles: [
+              {
+                id: "front-wide",
+                camera: "front_door",
+                crop: [0, 0, 1, 1],
+              },
+              {
+                id: "front-gate",
+                camera: "front_door",
+                crop: [0.5, 0.25, 1, 0.75],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    await frigateApp.goto("/?group=detail");
+
+    await expect(
+      frigateApp.page.locator('[data-camera="front-wide"]'),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(
+      frigateApp.page.locator('[data-camera="front-gate"]'),
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
   test("clicking a camera card opens the single-camera view via hash", async ({
     frigateApp,
   }) => {

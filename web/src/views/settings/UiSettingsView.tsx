@@ -26,6 +26,7 @@ import {
   CONTROL_COLUMN_CLASS_NAME,
 } from "@/components/card/SettingsGroupCard";
 import Heading from "@/components/ui/heading";
+import { getConfiguredPanels } from "@/utils/panelUtil";
 
 const WEEK_STARTS_ON = ["Sunday", "Monday"];
 
@@ -116,11 +117,13 @@ export default function UiSettingsView() {
       return [];
     }
 
-    Object.entries(config.camera_groups).forEach(async ([cameraName]) => {
-      await deleteUserNamespacedKey(`${cameraName}-draggable-layout`, username)
+    getConfiguredPanels(config).forEach(async ([panelName]) => {
+      await deleteUserNamespacedKey(`${panelName}-draggable-layout`, username)
         .then(() => {
           toast.success(
-            t("general.toast.success.clearStoredLayout", { cameraName }),
+            t("general.toast.success.clearStoredLayout", {
+              cameraName: panelName,
+            }),
             {
               position: "top-center",
             },

@@ -1491,6 +1491,10 @@
       "description": "Numeric order used to sort camera groups in the UI; larger numbers appear later."
     }
   },
+  "panels": {
+    "label": "Panels",
+    "description": "Named Live view panels containing independently framed camera tiles. When unset, legacy camera groups are shown as panels."
+  },
   "profiles": {
     "label": "Profiles",
     "description": "Named profile definitions with friendly names. Camera profiles must reference names defined here.",
