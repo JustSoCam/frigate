@@ -9,6 +9,7 @@ import threading
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -22,6 +23,8 @@ if TYPE_CHECKING:
     from frigate.config.config import FrigateConfig
 
 logger = logging.getLogger(__name__)
+
+REOLINK_CLEANUP_TIMEOUT = 5.0
 
 
 @dataclass(frozen=True)
@@ -172,29 +175,47 @@ class ReolinkEventProvider(threading.Thread):
                 )
             finally:
                 if host is not None:
-                    for callback_id in callback_ids:
-                        host.baichuan.unregister_callback(callback_id)
-                    try:
-                        await host.baichuan.unsubscribe_events()
-                    except Exception:
-                        logger.debug(
-                            "Failed to unsubscribe Reolink endpoint %s",
-                            endpoint.host,
-                            exc_info=True,
-                        )
-                    try:
-                        await host.logout()
-                    except Exception:
-                        logger.debug(
-                            "Failed to close Reolink endpoint %s",
-                            endpoint.host,
-                            exc_info=True,
-                        )
+                    await self._cleanup_host(host, endpoint, callback_ids)
 
             if self._stop_requested.is_set():
                 break
             await asyncio.sleep(delay + random.uniform(0, delay * 0.2))
             delay = min(delay * 2, 60)
+
+    async def _cleanup_host(
+        self, host: Any, endpoint: ReolinkEndpoint, callback_ids: list[str]
+    ) -> None:
+        """Bound teardown so a broken session cannot prevent reconnection."""
+        for callback_id in callback_ids:
+            host.baichuan.unregister_callback(callback_id)
+
+        await self._bounded_cleanup(
+            host.baichuan.unsubscribe_events(),
+            endpoint,
+            "unsubscribe",
+        )
+        await self._bounded_cleanup(host.logout(), endpoint, "close")
+
+    async def _bounded_cleanup(
+        self, cleanup: Awaitable[Any], endpoint: ReolinkEndpoint, operation: str
+    ) -> None:
+        try:
+            await asyncio.wait_for(cleanup, timeout=REOLINK_CLEANUP_TIMEOUT)
+        except TimeoutError:
+            logger.warning(
+                "Timed out waiting to %s Reolink endpoint %s:%d",
+                operation,
+                endpoint.host,
+                endpoint.port,
+            )
+        except Exception:
+            logger.debug(
+                "Failed to %s Reolink endpoint %s:%d",
+                operation,
+                endpoint.host,
+                endpoint.port,
+                exc_info=True,
+            )
 
     async def _monitor_connection(self, host: Any, endpoint: ReolinkEndpoint) -> None:
         disconnected_at: float | None = None
