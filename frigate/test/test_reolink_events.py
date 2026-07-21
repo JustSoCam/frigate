@@ -134,3 +134,26 @@ class TestReolinkEventProvider(TestCase):
         self.assertEqual(host.callback_ids, ["callback-id"])
         self.assertTrue(host.unsubscribe_started)
         self.assertTrue(host.logout_started)
+
+    def test_connection_setup_is_bounded_when_camera_never_returns(self):
+        provider = ReolinkEventProvider(
+            make_config(
+                {
+                    "front": make_camera(
+                        host="camera", username="user", password="pass", channel=0
+                    )
+                }
+            )
+        )
+        endpoint = provider.endpoints[0]
+
+        async def wait_forever() -> None:
+            await asyncio.Event().wait()
+
+        with (
+            patch("frigate.events.providers.reolink.REOLINK_CONNECT_TIMEOUT", 0.01),
+            self.assertRaisesRegex(TimeoutError, "load host data at camera:9000"),
+        ):
+            asyncio.run(
+                provider._bounded_connection(wait_forever(), endpoint, "load host data")
+            )

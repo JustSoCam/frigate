@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+REOLINK_CONNECT_TIMEOUT = 15.0
 REOLINK_CLEANUP_TIMEOUT = 5.0
 
 
@@ -143,7 +144,9 @@ class ReolinkEventProvider(threading.Thread):
                     bc_port=endpoint.port,
                     bc_only=True,
                 )
-                await host.get_host_data()
+                await self._bounded_connection(
+                    host.get_host_data(), endpoint, "load host data"
+                )
                 for camera in endpoint.cameras:
                     callback_id = f"frigate-{camera.camera}"
                     callback_ids.append(callback_id)
@@ -154,7 +157,9 @@ class ReolinkEventProvider(threading.Thread):
                         channel=camera.channel,
                     )
 
-                await host.baichuan.subscribe_events()
+                await self._bounded_connection(
+                    host.baichuan.subscribe_events(), endpoint, "subscribe to events"
+                )
                 for camera in endpoint.cameras:
                     self._reconcile_camera(host, camera)
                 logger.info(
@@ -181,6 +186,16 @@ class ReolinkEventProvider(threading.Thread):
                 break
             await asyncio.sleep(delay + random.uniform(0, delay * 0.2))
             delay = min(delay * 2, 60)
+
+    async def _bounded_connection(
+        self, connection: Awaitable[Any], endpoint: ReolinkEndpoint, operation: str
+    ) -> None:
+        try:
+            await asyncio.wait_for(connection, timeout=REOLINK_CONNECT_TIMEOUT)
+        except TimeoutError as error:
+            raise TimeoutError(
+                f"Timed out waiting to {operation} at {endpoint.host}:{endpoint.port}"
+            ) from error
 
     async def _cleanup_host(
         self, host: Any, endpoint: ReolinkEndpoint, callback_ids: list[str]
