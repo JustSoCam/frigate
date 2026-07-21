@@ -52,6 +52,7 @@ from frigate.embeddings import EmbeddingProcess, EmbeddingsContext
 from frigate.events.audio import AudioProcessor
 from frigate.events.cleanup import EventCleanup
 from frigate.events.maintainer import EventProcessor
+from frigate.events.providers.reolink import ReolinkEventProvider
 from frigate.jobs.export import reap_stale_exports
 from frigate.jobs.motion_search import stop_all_motion_search_jobs
 from frigate.log import _stop_logging
@@ -122,6 +123,7 @@ class FrigateApp:
         self.processes: dict[str, int] = {}
         self.embeddings: EmbeddingsContext | None = None
         self.profile_manager: ProfileManager | None = None
+        self.reolink_event_provider: ReolinkEventProvider | None = None
         self.config = config
 
     def ensure_dirs(self) -> None:
@@ -460,6 +462,12 @@ class FrigateApp:
         )
         self.event_processor.start()
 
+    def start_reolink_event_provider(self) -> None:
+        provider = ReolinkEventProvider(self.config)
+        if provider.enabled:
+            self.reolink_event_provider = provider
+            provider.start()
+
     def start_event_cleanup(self) -> None:
         self.event_cleanup = EventCleanup(self.config, self.stop_event, self.db)
         self.event_cleanup.start()
@@ -620,6 +628,7 @@ class FrigateApp:
         self.start_stats_emitter()
         self.start_timeline_processor()
         self.start_event_processor()
+        self.start_reolink_event_provider()
         self.start_event_cleanup()
         self.start_record_cleanup()
         self.start_watchdog()
@@ -655,6 +664,11 @@ class FrigateApp:
 
     def stop(self) -> None:
         logger.info("Stopping...")
+
+        # End camera-side events while the metadata pipeline is still active.
+        if self.reolink_event_provider:
+            self.reolink_event_provider.stop()
+            self.reolink_event_provider.join(timeout=10)
 
         # used by the docker healthcheck
         Path("/dev/shm/.frigate-is-stopping").touch()

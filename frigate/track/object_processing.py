@@ -93,7 +93,7 @@ class TrackedObjectProcessor(threading.Thread):
         self.sub_label_subscriber = EventMetadataSubscriber(EventMetadataTypeEnum.all)
 
         self.camera_activity: dict[str, dict[str, Any]] = {}
-        self.ongoing_manual_events: dict[str, str] = {}
+        self.ongoing_manual_events: dict[str, tuple[str, str]] = {}
 
         # {
         #   'zone_name': {
@@ -559,8 +559,13 @@ class TrackedObjectProcessor(threading.Thread):
             )
         )
 
-        if source_type == "api":
-            self.ongoing_manual_events[event_id] = camera_name
+        if source_type == "api" or source_type == "reolink":
+            detection_type = (
+                DetectionTypeEnum.api.value
+                if source_type == "api"
+                else DetectionTypeEnum.external.value
+            )
+            self.ongoing_manual_events[event_id] = (camera_name, detection_type)
             self.detection_publisher.publish(
                 (
                     camera_name,
@@ -576,7 +581,7 @@ class TrackedObjectProcessor(threading.Thread):
                         "end_time": end_time,
                     },
                 ),
-                DetectionTypeEnum.api.value,
+                detection_type,
             )
 
     def create_lpr_event(self, payload: tuple) -> None:
@@ -618,7 +623,10 @@ class TrackedObjectProcessor(threading.Thread):
             )
         )
 
-        self.ongoing_manual_events[event_id] = camera_name
+        self.ongoing_manual_events[event_id] = (
+            camera_name,
+            DetectionTypeEnum.lpr.value,
+        )
         self.detection_publisher.publish(
             (
                 camera_name,
@@ -647,9 +655,10 @@ class TrackedObjectProcessor(threading.Thread):
         )
 
         if event_id in self.ongoing_manual_events:
+            camera_name, detection_type = self.ongoing_manual_events[event_id]
             self.detection_publisher.publish(
                 (
-                    self.ongoing_manual_events[event_id],
+                    camera_name,
                     end_time,
                     {
                         "state": ManualEventState.end,
@@ -657,7 +666,7 @@ class TrackedObjectProcessor(threading.Thread):
                         "end_time": end_time,
                     },
                 ),
-                DetectionTypeEnum.api.value,
+                detection_type,
             )
             self.ongoing_manual_events.pop(event_id)
 

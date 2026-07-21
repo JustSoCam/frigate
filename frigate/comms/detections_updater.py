@@ -9,6 +9,7 @@ from .zmq_proxy import Publisher, Subscriber
 class DetectionTypeEnum(str, Enum):
     all = ""
     api = "api"
+    external = "external"
     video = "video"
     audio = "audio"
     lpr = "lpr"

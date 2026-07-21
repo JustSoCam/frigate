@@ -163,6 +163,30 @@ If available, recommended settings are:
 - `On, fluency first` this sets the camera to CBR (constant bit rate)
 - `Interframe Space 1x` this sets the iframe interval to the same as the frame rate
 
+#### Camera-side AI events
+
+Supported Reolink cameras can send their person, vehicle, and animal AI state changes to Frigate over the native TCP push connection on port 9000. These external detections use the camera's inference instead of running the same stream through a Frigate detector, while the configured video stream remains responsible for live view, recordings, and snapshots.
+
+```yaml
+cameras:
+  front:
+    reolink:
+      enabled: true
+      host: 192.168.1.20
+      port: 9000
+      username: "{FRIGATE_REOLINK_USER}"
+      password: "{FRIGATE_REOLINK_PASSWORD}"
+      channel: 0
+      labels:
+        people: person
+        vehicle: car
+        dog_cat: animal
+```
+
+For cameras connected through an NVR, use the NVR address and credentials and set `channel` for each Frigate camera. Cameras on the same endpoint share one persistent connection. Credentials should be supplied with Frigate environment variables or Docker secrets rather than written directly in the configuration file.
+
+Reolink AI events contain a label and active/inactive state, but no reliable bounding box. They can create Review items, recordings, snapshots, MQTT events, and notifications; pixel-based zones and object paths still require Frigate object detection. Confirm the camera-side events are reliable for the installation before disabling Frigate detection on that camera.
+
 #### Setup via the Add Camera Wizard
 
 The Add Camera Wizard is the recommended way to add a standard Reolink camera. Before starting, make sure [HTTP is enabled](https://support.reolink.com/articles/360003452893-How-to-Access-Reolink-Cameras-NVRs-Home-Hub-Locally-via-Web-Browsers/) in the camera's advanced network settings. The wizard uses the camera's HTTP API to determine its resolution and choose the recommended stream type from the table above.

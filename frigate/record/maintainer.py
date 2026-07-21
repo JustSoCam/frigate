@@ -772,6 +772,7 @@ class RecordingMaintainer(threading.Thread):
                         )
                 elif (
                     topic == DetectionTypeEnum.api.value
+                    or topic == DetectionTypeEnum.external.value
                     or topic == DetectionTypeEnum.lpr.value
                 ):
                     continue

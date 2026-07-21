@@ -654,6 +654,7 @@ class ReviewSegmentMaintainer(threading.Thread):
                 ) = data
             elif (
                 topic == DetectionTypeEnum.api.value
+                or topic == DetectionTypeEnum.external.value
                 or topic == DetectionTypeEnum.lpr.value
             ):
                 (
@@ -714,12 +715,19 @@ class ReviewSegmentMaintainer(threading.Thread):
                         ) and camera_config.review.detections.enabled:
                             current_segment.audio.add(audio)
                             current_segment.last_detection_time = frame_time
-                elif topic == DetectionTypeEnum.api or topic == DetectionTypeEnum.lpr:
+                elif topic in (
+                    DetectionTypeEnum.api,
+                    DetectionTypeEnum.external,
+                    DetectionTypeEnum.lpr,
+                ):
                     if manual_info["state"] == ManualEventState.complete:
                         current_segment.detections[manual_info["event_id"]] = (
                             manual_info["label"]
                         )
-                        if topic == DetectionTypeEnum.api:
+                        if topic in (
+                            DetectionTypeEnum.api,
+                            DetectionTypeEnum.external,
+                        ):
                             # manual_info["label"] contains 'label: sub_label'
                             # so split out the label without modifying manual_info
                             det_labels = self.config.cameras[
@@ -752,7 +760,7 @@ class ReviewSegmentMaintainer(threading.Thread):
                             manual_info["label"]
                         )
                         if (
-                            topic == DetectionTypeEnum.api
+                            topic in (DetectionTypeEnum.api, DetectionTypeEnum.external)
                             and self.config.cameras[camera].review.alerts.enabled
                         ):
                             # manual_info["label"] contains 'label: sub_label'
@@ -838,7 +846,10 @@ class ReviewSegmentMaintainer(threading.Thread):
                             [],
                             detections,
                         )
-                elif topic == DetectionTypeEnum.api:
+                elif topic in (
+                    DetectionTypeEnum.api,
+                    DetectionTypeEnum.external,
+                ):
                     severity = None
                     # manual_info["label"] contains 'label: sub_label'
                     # so split out the label without modifying manual_info
@@ -876,7 +887,7 @@ class ReviewSegmentMaintainer(threading.Thread):
                             api_segment.last_detection_time = manual_info["end_time"]
                     else:
                         logger.warning(
-                            f"Manual event API has been called for {camera}, but alerts and detections are disabled. This manual event will not appear as an alert or detection."
+                            f"An external or manual event was received for {camera}, but alerts and detections are disabled. This event will not appear as an alert or detection."
                         )
                 elif topic == DetectionTypeEnum.lpr:
                     if self.config.cameras[camera].review.detections.enabled:

@@ -35,6 +35,7 @@ from .objects import ObjectConfig
 from .onvif import OnvifConfig
 from .profile import CameraProfileConfig
 from .record import RecordConfig
+from .reolink import ReolinkConfig
 from .review import ReviewConfig
 from .snapshots import SnapshotsConfig
 from .timestamp import TimestampStyleConfig
@@ -126,6 +127,11 @@ class CameraConfig(FrigateBaseModel):
         default_factory=RecordConfig,
         title="Recording",
         description="Recording and retention settings for this camera.",
+    )
+    reolink: ReolinkConfig = Field(
+        default_factory=ReolinkConfig,
+        title="Reolink AI events",
+        description="Native Reolink TCP push events from camera-side AI inference.",
     )
     review: ReviewConfig = Field(
         default_factory=ReviewConfig,
