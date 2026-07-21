@@ -57,8 +57,13 @@ RUN --mount=type=tmpfs,target=/tmp --mount=type=tmpfs,target=/var/cache/apt \
 # require glibc 2.38 which is not available on bookworm).
 FROM base AS intel-media-driver
 ARG DEBIAN_FRONTEND
+ARG SKIP_INTEL_MEDIA_DRIVER=false
 RUN --mount=type=bind,source=docker/main/build_intel_media_driver.sh,target=/deps/build_intel_media_driver.sh \
-    /deps/build_intel_media_driver.sh
+    if [ "$SKIP_INTEL_MEDIA_DRIVER" = "true" ]; then \
+        mkdir -p /rootfs; \
+    else \
+        /deps/build_intel_media_driver.sh; \
+    fi
 
 FROM scratch AS go2rtc
 ARG TARGETARCH
