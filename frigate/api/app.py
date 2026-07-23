@@ -47,6 +47,10 @@ from frigate.config.camera.updater import (
 from frigate.const import REDACTED_CREDENTIAL_SENTINEL
 from frigate.ffmpeg_presets import FFMPEG_HWACCEL_VAAPI, _gpu_selector
 from frigate.genai import PROVIDERS, load_providers
+from frigate.genai.codex_cli_control import (
+    build_codex_env,
+    resolve_codex_executable,
+)
 from frigate.jobs.media_sync import (
     get_current_media_sync_job,
     get_media_sync_job_by_id,
@@ -184,6 +188,97 @@ def metrics(request: Request):
 )
 def genai_models(request: Request):
     return JSONResponse(content=request.app.genai_manager.list_models())
+
+
+def _get_codex_cli_connection(
+    request: Request, name: str
+) -> tuple[str, dict[str, str]]:
+    config = request.app.frigate_config.genai.get(name)
+    if not config or config.provider != GenAIProviderEnum.codex_cli:
+        raise ValueError("Unknown Codex CLI provider")
+    configured_path = str(config.provider_options.get("codex_path", "codex"))
+    codex_home = str(config.provider_options.get("codex_home", "/config/codex"))
+    return (
+        resolve_codex_executable(configured_path),
+        build_codex_env(codex_home),
+    )
+
+
+@router.get(
+    "/genai/codex/auth",
+    dependencies=[Depends(require_role(["admin"]))],
+    summary="Get Codex ChatGPT authentication status",
+)
+async def genai_codex_auth_status(request: Request, name: str):
+    try:
+        executable, env = _get_codex_cli_connection(request, name)
+        status = await asyncio.to_thread(
+            request.app.codex_cli_control.get_status,
+            name,
+            executable,
+            env,
+        )
+        return JSONResponse(content=status)
+    except (RuntimeError, TimeoutError, ValueError) as error:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": str(error)},
+        )
+
+
+@router.post(
+    "/genai/codex/auth/login",
+    dependencies=[Depends(require_role(["admin"]))],
+    summary="Start Codex ChatGPT device-code authentication",
+)
+async def genai_codex_auth_login(request: Request, name: str):
+    try:
+        executable, env = _get_codex_cli_connection(request, name)
+        status = await asyncio.to_thread(
+            request.app.codex_cli_control.start_login,
+            name,
+            executable,
+            env,
+        )
+        return JSONResponse(content=status)
+    except (RuntimeError, TimeoutError, ValueError) as error:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": str(error)},
+        )
+
+
+@router.post(
+    "/genai/codex/auth/cancel",
+    dependencies=[Depends(require_role(["admin"]))],
+    summary="Cancel Codex ChatGPT device-code authentication",
+)
+async def genai_codex_auth_cancel(request: Request, name: str):
+    await asyncio.to_thread(request.app.codex_cli_control.cancel_login, name)
+    return JSONResponse(content={"status": "signed_out"})
+
+
+@router.post(
+    "/genai/codex/auth/logout",
+    dependencies=[Depends(require_role(["admin"]))],
+    summary="Sign out of Codex ChatGPT authentication",
+)
+async def genai_codex_auth_logout(request: Request, name: str):
+    try:
+        executable, env = _get_codex_cli_connection(request, name)
+        status = await asyncio.to_thread(
+            request.app.codex_cli_control.logout,
+            name,
+            executable,
+            env,
+        )
+        request.app.genai_manager.update_config(request.app.frigate_config)
+        return JSONResponse(content=status)
+    except (RuntimeError, TimeoutError, ValueError) as error:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": str(error)},
+        )
 
 
 @router.post(

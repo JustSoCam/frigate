@@ -39,6 +39,7 @@ from frigate.config.profile_manager import ProfileManager
 from frigate.debug_replay import DebugReplayManager, debug_replay_auto_stop_watchdog
 from frigate.embeddings import EmbeddingsContext
 from frigate.genai import GenAIClientManager
+from frigate.genai.codex_cli_control import CodexCLIControl
 from frigate.ptz.onvif import OnvifController
 from frigate.stats.emitter import StatsEmitter
 from frigate.storage import StorageMaintainer
@@ -122,6 +123,10 @@ def create_fastapi_app(
             )
         )
 
+    @app.on_event("shutdown")
+    async def shutdown():
+        app.codex_cli_control.close()
+
     # Rate limiter (used for login endpoint)
     if frigate_config.auth.failed_login_rate_limit is None:
         limiter.enabled = False
@@ -151,6 +156,7 @@ def create_fastapi_app(
     # App Properties
     app.frigate_config = frigate_config
     app.genai_manager = GenAIClientManager(frigate_config)
+    app.codex_cli_control = CodexCLIControl()
     app.embeddings = embeddings
     app.detected_frames_processor = detected_frames_processor
     app.storage_maintainer = storage_maintainer

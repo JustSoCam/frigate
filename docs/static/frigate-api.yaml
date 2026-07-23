@@ -2405,6 +2405,122 @@ paths:
       security:
         - frigateAdminAuth: []
       x-required-role: admin
+  /genai/codex/auth:
+    get:
+      tags:
+        - App
+      summary: Get Codex ChatGPT authentication status
+      operationId: genai_codex_auth_status_genai_codex_auth_get
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+            title: Name
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+        - frigateAdminAuth: []
+      x-required-role: admin
+      description: '**Access:** Admin role required.'
+  /genai/codex/auth/login:
+    post:
+      tags:
+        - App
+      summary: Start Codex ChatGPT device-code authentication
+      operationId: genai_codex_auth_login_genai_codex_auth_login_post
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+            title: Name
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+        - frigateAdminAuth: []
+      x-required-role: admin
+      description: '**Access:** Admin role required.'
+  /genai/codex/auth/cancel:
+    post:
+      tags:
+        - App
+      summary: Cancel Codex ChatGPT device-code authentication
+      operationId: genai_codex_auth_cancel_genai_codex_auth_cancel_post
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+            title: Name
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+        - frigateAdminAuth: []
+      x-required-role: admin
+      description: '**Access:** Admin role required.'
+  /genai/codex/auth/logout:
+    post:
+      tags:
+        - App
+      summary: Sign out of Codex ChatGPT authentication
+      operationId: genai_codex_auth_logout_genai_codex_auth_logout_post
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+            title: Name
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+        - frigateAdminAuth: []
+      x-required-role: admin
+      description: '**Access:** Admin role required.'
   /genai/probe:
     post:
       tags:

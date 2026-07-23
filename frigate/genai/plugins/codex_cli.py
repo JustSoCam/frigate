@@ -18,6 +18,10 @@ from typing import Any
 
 from frigate.config import GenAIConfig, GenAIProviderEnum
 from frigate.genai import GenAIClient, register_genai_provider
+from frigate.genai.codex_cli_control import (
+    build_codex_env,
+    list_subscription_models,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,6 @@ _DISABLED_FEATURES = (
     "workspace_dependencies",
 )
 _REASONING_EFFORTS = {"none", "low", "medium", "high", "xhigh", "max"}
-_AUTH_ENV_VARS = ("OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN")
 
 
 @dataclass
@@ -198,15 +201,10 @@ class CodexCLIClient(GenAIClient):
 
     def _build_env(self) -> dict[str, str]:
         """Build an environment that can only use saved Codex authentication."""
-        env = os.environ.copy()
-        for variable in _AUTH_ENV_VARS:
-            env.pop(variable, None)
-
         codex_home = self.genai_config.provider_options.get(
             "codex_home", "/config/codex"
         )
-        env["CODEX_HOME"] = os.path.expanduser(str(codex_home))
-        return env
+        return build_codex_env(str(codex_home))
 
     def _check_subscription_login(self, executable: str) -> None:
         """Require a saved ChatGPT login rather than usage-billed API auth."""
@@ -236,16 +234,22 @@ class CodexCLIClient(GenAIClient):
         return executable
 
     def list_models(self) -> list[str]:
-        """Return configured choices after checking subscription authentication."""
+        """Return models available to the saved ChatGPT subscription."""
         if not self._authenticated:
             self._check_subscription_login(self.provider)
 
+        discovered_models = list_subscription_models(
+            self.provider,
+            self._build_env(),
+            min(self.timeout, 15),
+        )
         configured_models = self.genai_config.provider_options.get("models", [])
         models = [
             model
             for model in configured_models
             if isinstance(model, str) and model.strip()
         ]
+        models.extend(discovered_models)
         current_model = self.genai_config.model.strip()
         if current_model and current_model != "probe":
             models.append(current_model)

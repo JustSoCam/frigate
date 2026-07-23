@@ -1697,6 +1697,25 @@
       "probeFailed": "Failed to probe models",
       "fetchedModels": "Successfully fetched model list"
     },
+    "codexAuth": {
+      "checking": "Checking ChatGPT sign in…",
+      "statusFailed": "Unable to check ChatGPT sign-in status",
+      "finishSignIn": "Finish signing in with ChatGPT",
+      "enterCode": "Open ChatGPT, sign in to your account, then enter this one-time code.",
+      "copyCode": "Copy sign-in code",
+      "codeCopied": "Sign-in code copied",
+      "openChatGPT": "Open ChatGPT",
+      "signedIn": "Signed in with ChatGPT",
+      "subscription": "{{plan}} subscription",
+      "signOut": "Sign out",
+      "signOutComplete": "Signed out of ChatGPT",
+      "notSignedIn": "ChatGPT is not signed in",
+      "signInDesc": "Use a ChatGPT subscription for Codex-powered descriptions and chat.",
+      "signIn": "Sign in with ChatGPT",
+      "signInComplete": "Signed in with ChatGPT",
+      "actionFailed": "Unable to update ChatGPT sign in",
+      "saveFirst": "Save this provider before signing in with ChatGPT."
+    },
     "ptzPresets": {
       "placeholder": "Select or enter a preset...",
       "search": "Search or enter a preset...",

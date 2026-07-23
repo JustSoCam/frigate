@@ -209,7 +209,7 @@ The Codex login directory contains refreshable credentials. Mount a dedicated di
 
 :::
 
-#### Install and sign in
+#### Install and mount
 
 Install the standalone Codex CLI on the Docker host, using dedicated binary and authentication directories:
 
@@ -219,9 +219,6 @@ curl -fsSL https://chatgpt.com/codex/install.sh \
   | CODEX_INSTALL_DIR=/opt/frigate-codex/bin \
     CODEX_HOME=/opt/frigate-codex/home \
     CODEX_NON_INTERACTIVE=1 sh
-
-CODEX_HOME=/opt/frigate-codex/home \
-  /opt/frigate-codex/bin/codex login --device-auth
 ```
 
 Mount the native executable read-only and the dedicated login directory read-write:
@@ -243,7 +240,9 @@ The login directory must be writable so Codex can refresh subscription credentia
 
 1. Navigate to <NavPath path="Settings > Enrichments > Generative AI" />.
    - Set **Provider** to `codex_cli`
-   - Set **Model** to `default` to follow the Codex CLI recommendation, or enter a Codex model available to your subscription
+   - Save the provider, then select **Sign in with ChatGPT**
+   - Open the displayed verification link and enter the one-time code
+   - Select a model available to your ChatGPT subscription, or use `default` to follow the Codex CLI recommendation
    - Select **Descriptions** and optionally **Chat** roles
    - Do not select **Embeddings**, which the Codex CLI provider does not support
    - Leave **API key** and **Base URL** empty
@@ -272,6 +271,8 @@ genai:
 </ConfigTabs>
 
 Each request runs ephemerally with shell access, web search, plugins, apps, and workspace tools disabled. Requests are serialized by default to avoid bursts against subscription limits. Frigate Chat function selection is returned as structured output and executed by Frigate, not by Codex itself.
+
+Frigate uses the Codex app-server protocol to manage sign in, sign out, account status, and model discovery. Credentials remain in the mounted Codex directory and are never returned by the Frigate API.
 
 ### Ollama Cloud
 

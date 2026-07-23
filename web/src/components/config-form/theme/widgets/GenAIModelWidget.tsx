@@ -25,6 +25,7 @@ import {
 import type { ConfigFormContext, JsonObject } from "@/types/configForm";
 import type { GenAIModelsResponse } from "@/types/chat";
 import { getSizedFieldClassName } from "../utils";
+import { CodexCLIAuth } from "./CodexCLIAuth";
 
 type ProbeResponse =
   | { success: true; models: string[] }
@@ -147,6 +148,19 @@ export function GenAIModelWidget(props: WidgetProps) {
 
   const formProvider =
     typeof formEntry?.provider === "string" ? formEntry.provider : null;
+  const savedProvider = useMemo(() => {
+    if (!providerKey) return null;
+    const genai = (
+      formContext?.fullConfig as Record<string, unknown> | undefined
+    )?.genai;
+    if (!genai || typeof genai !== "object" || Array.isArray(genai))
+      return null;
+    const entry = (genai as Record<string, unknown>)[providerKey];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry))
+      return null;
+    const provider = (entry as Record<string, unknown>).provider;
+    return typeof provider === "string" ? provider : null;
+  }, [providerKey, formContext?.fullConfig]);
   const canProbe = Boolean(formProvider) && !probing;
 
   const probe = async () => {
@@ -351,6 +365,25 @@ export function GenAIModelWidget(props: WidgetProps) {
           <span className="text-destructive">{probeError}</span>
         )}
       </div>
+      {formProvider === "codex_cli" &&
+        providerKey &&
+        savedProvider === "codex_cli" && (
+          <CodexCLIAuth
+            providerKey={providerKey}
+            onAuthenticated={() => mutateModels()}
+          />
+        )}
+      {formProvider === "codex_cli" &&
+        providerKey &&
+        savedProvider !== "codex_cli" && (
+          <div className="mt-2 rounded-lg border border-secondary-highlight bg-background_alt p-3 text-xs text-muted-foreground">
+            {t("configForm.codexAuth.saveFirst", {
+              ns: "views/settings",
+              defaultValue:
+                "Save this provider before signing in with ChatGPT.",
+            })}
+          </div>
+        )}
     </div>
   );
 }

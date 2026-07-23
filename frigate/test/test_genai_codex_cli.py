@@ -39,6 +39,26 @@ class TestCodexCLIProvider(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "ChatGPT subscription"):
                 client.list_models()
 
+    def test_subscription_models_are_discovered(self):
+        client = _client(
+            model="gpt-current",
+            provider_options={"models": ["gpt-configured"]},
+        )
+        with (
+            patch(
+                "frigate.genai.plugins.codex_cli._run_subprocess",
+                return_value=_ProcessResult(0, "Logged in using ChatGPT", ""),
+            ),
+            patch(
+                "frigate.genai.plugins.codex_cli.list_subscription_models",
+                return_value=["gpt-live", "gpt-current"],
+            ),
+        ):
+            self.assertEqual(
+                client.list_models(),
+                ["default", "gpt-configured", "gpt-current", "gpt-live"],
+            )
+
     def test_description_disables_tools_and_strips_api_auth(self):
         client = _client()
         captured = {}
