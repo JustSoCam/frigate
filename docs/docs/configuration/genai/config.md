@@ -9,7 +9,7 @@ import NavPath from "@site/src/components/NavPath";
 
 ## Configuration
 
-A Generative AI provider can be configured in the global config, which will make the Generative AI features available for use. There are currently 4 native providers available to integrate with Frigate. Other providers that support the OpenAI standard API can also be used. See the OpenAI-Compatible section below.
+A Generative AI provider can be configured in the global config, which will make the Generative AI features available for use. Frigate includes the native providers listed below. Other providers that support the OpenAI standard API can also be used. See the OpenAI-Compatible section below.
 
 To use Generative AI, you must define a single provider at the global level of your Frigate configuration. If the provider you choose requires an API key, you may either directly paste it in your configuration, or store it in an environment variable prefixed with `FRIGATE_`.
 
@@ -196,6 +196,82 @@ Cloud providers run on remote infrastructure and require an API key for authenti
 Cloud Generative AI providers require an active internet connection to send images and prompts for processing. Local providers like llama.cpp and Ollama (with local models) do not require internet. See [Network Requirements](/frigate/network_requirements#generative-ai) for details.
 
 :::
+
+### Codex CLI with a ChatGPT subscription
+
+The `codex_cli` provider runs the [Codex CLI](https://developers.openai.com/codex/cli) non-interactively and reuses a dedicated **Sign in with ChatGPT** session. This allows a private Frigate installation to use ChatGPT-managed Codex access without configuring an OpenAI Platform API key.
+
+The CLI runs locally, but prompts and camera images are sent to OpenAI for inference. Usage follows the limits and policies of the ChatGPT workspace used to sign in. This provider is best suited to review descriptions and occasional Chat use rather than high-frequency generation for every tracked object.
+
+:::warning
+
+The Codex login directory contains refreshable credentials. Mount a dedicated directory for Frigate, keep it private, and never commit or share its contents. The provider rejects API-key authentication and removes OpenAI and Codex API-key environment variables from each request.
+
+:::
+
+#### Install and sign in
+
+Install the standalone Codex CLI on the Docker host, using dedicated binary and authentication directories:
+
+```bash
+mkdir -p /opt/frigate-codex/bin /opt/frigate-codex/home
+curl -fsSL https://chatgpt.com/codex/install.sh \
+  | CODEX_INSTALL_DIR=/opt/frigate-codex/bin \
+    CODEX_HOME=/opt/frigate-codex/home \
+    CODEX_NON_INTERACTIVE=1 sh
+
+CODEX_HOME=/opt/frigate-codex/home \
+  /opt/frigate-codex/bin/codex login --device-auth
+```
+
+Mount the native executable read-only and the dedicated login directory read-write:
+
+```yaml
+services:
+  frigate:
+    volumes:
+      - /opt/frigate-codex/bin/codex:/usr/local/bin/codex:ro
+      - /opt/frigate-codex/home:/config/codex
+```
+
+The login directory must be writable so Codex can refresh subscription credentials.
+
+#### Configuration
+
+<ConfigTabs>
+<TabItem value="ui">
+
+1. Navigate to <NavPath path="Settings > Enrichments > Generative AI" />.
+   - Set **Provider** to `codex_cli`
+   - Set **Model** to `default` to follow the Codex CLI recommendation, or enter a Codex model available to your subscription
+   - Select **Descriptions** and optionally **Chat** roles
+   - Do not select **Embeddings**, which the Codex CLI provider does not support
+   - Leave **API key** and **Base URL** empty
+
+</TabItem>
+<TabItem value="yaml">
+
+```yaml
+genai:
+  codex:
+    provider: codex_cli
+    model: default
+    roles:
+      - descriptions
+      - chat
+    provider_options:
+      codex_path: /usr/local/bin/codex
+      codex_home: /config/codex
+      max_concurrent_requests: 1
+      context_size: 128000
+    runtime_options:
+      reasoning_effort: none
+```
+
+</TabItem>
+</ConfigTabs>
+
+Each request runs ephemerally with shell access, web search, plugins, apps, and workspace tools disabled. Requests are serialized by default to avoid bursts against subscription limits. Frigate Chat function selection is returned as structured output and executed by Frigate, not by Codex itself.
 
 ### Ollama Cloud
 

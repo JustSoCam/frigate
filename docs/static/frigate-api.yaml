@@ -8271,6 +8271,7 @@ components:
       enum:
         - openai
         - azure_openai
+        - codex_cli
         - gemini
         - ollama
         - llamacpp
