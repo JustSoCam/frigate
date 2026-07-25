@@ -88,6 +88,7 @@ class ExternalFaceEnricher:
             stream_name,
             self.clock(),
         )
+        logger.info("Starting main-stream face enrichment for %s", camera)
         self._schedule_due(self.clock())
 
     def end(self, event_id: str, camera: str) -> None:
@@ -134,13 +135,29 @@ class ExternalFaceEnricher:
                     cv2.IMREAD_COLOR,
                 )
                 if frame is not None:
+                    logger.debug(
+                        "Processing %dx%d main-stream face frame for %s",
+                        frame.shape[1],
+                        frame.shape[0],
+                        event.camera,
+                    )
                     recognized = self.face_processor.process_external_frame(
                         event.event_id,
                         event.camera,
                         frame,
                     )
 
-            if recognized or event.ended or event.attempts >= CAPTURE_ATTEMPTS:
+            if recognized:
+                logger.info("Matched face from main stream for %s", event.camera)
+                self._finish(event.event_id, event.camera)
+            elif event.ended:
+                self._finish(event.event_id, event.camera)
+            elif event.attempts >= CAPTURE_ATTEMPTS:
+                logger.info(
+                    "No face match from main stream for %s after %d attempts",
+                    event.camera,
+                    event.attempts,
+                )
                 self._finish(event.event_id, event.camera)
             else:
                 event.next_capture = now + CAPTURE_INTERVAL
