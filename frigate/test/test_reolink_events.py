@@ -46,18 +46,37 @@ def make_config(cameras):
     return SimpleNamespace(cameras=cameras)
 
 
-def make_camera(enabled=True, **reolink):
+def make_camera(
+    enabled=True,
+    face_enabled=True,
+    record_path="rtsp://127.0.0.1:8554/front-main",
+    **reolink,
+):
+    reolink_config = {
+        "enabled": True,
+        "host": "camera",
+        "port": 9000,
+        "username": "user",
+        "password": "pass",
+        "channel": 0,
+        "labels": {"people": "person", "vehicle": "car", "dog_cat": "animal"},
+        "include_recording": True,
+        "score": 1.0,
+        "disconnect_grace": 15,
+    }
+    reolink_config.update(reolink)
     return SimpleNamespace(
         enabled=enabled,
-        reolink=SimpleNamespace(
-            enabled=True,
-            port=9000,
-            labels={"people": "person", "vehicle": "car", "dog_cat": "animal"},
-            include_recording=True,
-            score=1.0,
-            disconnect_grace=15,
-            **reolink,
+        face_recognition=SimpleNamespace(enabled=face_enabled),
+        ffmpeg=SimpleNamespace(
+            inputs=[
+                SimpleNamespace(path=record_path, roles=["record"]),
+                SimpleNamespace(
+                    path="rtsp://127.0.0.1:8554/front-sub", roles=["detect"]
+                ),
+            ]
         ),
+        reolink=SimpleNamespace(**reolink_config),
     )
 
 
@@ -102,18 +121,56 @@ class TestReolinkEventProvider(TestCase):
         host.states[(0, "people")] = False
         provider._reconcile_camera(host, camera)
 
-        self.assertEqual(len(publisher.messages), 2)
+        self.assertEqual(len(publisher.messages), 4)
         create_topic, create_payload = publisher.messages[0]
-        end_topic, end_payload = publisher.messages[1]
+        face_start_topic, face_start_payload = publisher.messages[1]
+        end_topic, end_payload = publisher.messages[2]
+        face_end_topic, face_end_payload = publisher.messages[3]
         self.assertEqual(create_topic, EventMetadataTypeEnum.manual_event_create.value)
         self.assertEqual(create_payload[1], "front")
         self.assertEqual(create_payload[2], "person")
         self.assertEqual(create_payload[6], "reolink_ai_people")
         self.assertIsNone(create_payload[7])
         self.assertEqual(create_payload[8], "reolink")
+        self.assertEqual(
+            face_start_topic, EventMetadataTypeEnum.external_face_start.value
+        )
+        self.assertEqual(face_start_payload[0], create_payload[3])
+        self.assertEqual(face_start_payload[1:], ("front", "front-main"))
         self.assertEqual(end_topic, EventMetadataTypeEnum.manual_event_end.value)
         self.assertEqual(end_payload[0], create_payload[3])
+        self.assertEqual(face_end_topic, EventMetadataTypeEnum.external_face_end.value)
+        self.assertEqual(face_end_payload, (create_payload[3], "front"))
         self.assertEqual(provider._active_events, {})
+
+    def test_face_enrichment_requires_enabled_face_recognition_and_local_restream(self):
+        disabled = ReolinkEventProvider(
+            make_config(
+                {
+                    "front": make_camera(
+                        host="camera",
+                        username="user",
+                        password="pass",
+                        face_enabled=False,
+                    )
+                }
+            )
+        )
+        direct = ReolinkEventProvider(
+            make_config(
+                {
+                    "front": make_camera(
+                        host="camera",
+                        username="user",
+                        password="pass",
+                        record_path="rtsp://camera/main",
+                    )
+                }
+            )
+        )
+
+        self.assertIsNone(disabled.endpoints[0].cameras[0].face_stream)
+        self.assertIsNone(direct.endpoints[0].cameras[0].face_stream)
 
     def test_cleanup_is_bounded_when_camera_calls_never_return(self):
         provider = ReolinkEventProvider(

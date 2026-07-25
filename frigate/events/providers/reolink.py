@@ -13,11 +13,13 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote, urlparse
 
 from frigate.comms.event_metadata_updater import (
     EventMetadataPublisher,
     EventMetadataTypeEnum,
 )
+from frigate.config.camera.ffmpeg import CameraRoleEnum
 
 if TYPE_CHECKING:
     from frigate.config.config import FrigateConfig
@@ -36,6 +38,7 @@ class ReolinkCamera:
     include_recording: bool
     score: float
     disconnect_grace: int
+    face_stream: str | None
 
 
 @dataclass(frozen=True)
@@ -54,10 +57,32 @@ class ReolinkEventProvider(threading.Thread):
         super().__init__(name="reolink_event_provider")
         self.endpoints = self._build_endpoints(config)
         self._active_events: dict[tuple[str, str], str] = {}
+        self._active_face_events: set[str] = set()
         self._stop_requested = threading.Event()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._async_stop: asyncio.Event | None = None
         self._publisher: EventMetadataPublisher | None = None
+
+    @staticmethod
+    def _record_restream_name(camera_config: Any) -> str | None:
+        """Return the local go2rtc record stream name used for face frames."""
+        record_input = next(
+            (
+                ffmpeg_input
+                for ffmpeg_input in camera_config.ffmpeg.inputs
+                if CameraRoleEnum.record in ffmpeg_input.roles
+            ),
+            None,
+        )
+        if record_input is None:
+            return None
+
+        parsed = urlparse(str(record_input.path))
+        if parsed.hostname not in {"127.0.0.1", "localhost"}:
+            return None
+
+        stream_name = unquote(parsed.path.rsplit("/", 1)[-1]).strip()
+        return stream_name or None
 
     @staticmethod
     def _build_endpoints(config: FrigateConfig) -> tuple[ReolinkEndpoint, ...]:
@@ -78,6 +103,12 @@ class ReolinkEventProvider(threading.Thread):
                     include_recording=reolink.include_recording,
                     score=reolink.score,
                     disconnect_grace=reolink.disconnect_grace,
+                    face_stream=(
+                        ReolinkEventProvider._record_restream_name(camera_config)
+                        if camera_config.face_recognition.enabled
+                        and "person" in reolink.labels.values()
+                        else None
+                    ),
                 )
             )
 
@@ -288,6 +319,12 @@ class ReolinkEventProvider(threading.Thread):
             ),
             EventMetadataTypeEnum.manual_event_create.value,
         )
+        if frigate_label == "person" and camera.face_stream:
+            self._active_face_events.add(event_id)
+            self._publisher.publish(
+                (event_id, camera.camera, camera.face_stream),
+                EventMetadataTypeEnum.external_face_start.value,
+            )
         logger.info("Reolink AI event started for %s: %s", camera.camera, frigate_label)
 
     def _end_event(self, key: tuple[str, str]) -> None:
@@ -298,6 +335,12 @@ class ReolinkEventProvider(threading.Thread):
             (event_id, time.time()),
             EventMetadataTypeEnum.manual_event_end.value,
         )
+        if event_id in self._active_face_events:
+            self._active_face_events.remove(event_id)
+            self._publisher.publish(
+                (event_id, key[0]),
+                EventMetadataTypeEnum.external_face_end.value,
+            )
         logger.info("Reolink AI event ended for %s: %s", key[0], key[1])
 
     def _end_camera_events(self, camera: str) -> None:

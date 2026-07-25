@@ -18,6 +18,8 @@ class EventMetadataTypeEnum(str, Enum):
     attribute = "attribute"
     lpr_event_create = "lpr_event_create"
     save_lpr_snapshot = "save_lpr_snapshot"
+    external_face_start = "external_face_start"
+    external_face_end = "external_face_end"
 
 
 class EventMetadataPublisher(Publisher):

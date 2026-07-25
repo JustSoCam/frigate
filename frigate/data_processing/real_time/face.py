@@ -327,19 +327,20 @@ class FaceRealTimeProcessor(RealTimeProcessorApi):
             self.person_face_history[id]
         )
 
-        self.requestor.send_data(
-            "tracked_object_update",
-            json.dumps(
-                {
-                    "type": TrackedObjectUpdateTypesEnum.face,
-                    "name": weighted_sub_label,
-                    "score": weighted_score,
-                    "id": id,
-                    "camera": camera,
-                    "timestamp": start,
-                }
-            ),
-        )
+        if not obj_data.get("_external_event"):
+            self.requestor.send_data(
+                "tracked_object_update",
+                json.dumps(
+                    {
+                        "type": TrackedObjectUpdateTypesEnum.face,
+                        "name": weighted_sub_label,
+                        "score": weighted_score,
+                        "id": id,
+                        "camera": camera,
+                        "timestamp": start,
+                    }
+                ),
+            )
 
         if weighted_score >= self.face_config.recognition_threshold:
             self.sub_label_publisher.publish(
@@ -348,6 +349,31 @@ class FaceRealTimeProcessor(RealTimeProcessorApi):
             )
 
         self.__update_metrics(datetime.datetime.now().timestamp() - start)
+
+    def process_external_frame(
+        self,
+        event_id: str,
+        camera: str,
+        frame: np.ndarray,
+    ) -> bool:
+        """Match a face in a full-resolution frame for an external event."""
+        height, width = frame.shape[:2]
+        yuv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420)
+        self.process_frame(
+            {
+                "id": event_id,
+                "camera": camera,
+                "label": "person",
+                "box": (0, 0, width, height),
+                "sub_label": None,
+                "_external_event": True,
+            },
+            yuv_frame,
+        )
+
+        history = self.person_face_history.get(event_id, [])
+        name, score = self.weighted_average(history)
+        return name is not None and score >= self.face_config.recognition_threshold
 
     def handle_request(
         self, topic: str, request_data: dict[str, Any]

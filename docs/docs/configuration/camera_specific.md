@@ -187,6 +187,12 @@ For cameras connected through an NVR, use the NVR address and credentials and se
 
 Reolink AI events contain a label and active/inactive state, but no reliable bounding box. They can create Review items, recordings, snapshots, MQTT events, and notifications; pixel-based zones and object paths still require Frigate object detection. Confirm the camera-side events are reliable for the installation before disabling Frigate detection on that camera.
 
+When face recognition is enabled, Reolink person events also use the camera's
+local go2rtc `record` restream for face detection and matching. This lets the
+main stream provide full-resolution face detail without enabling Frigate object
+detection or opening another connection to the camera. The `record` input must
+point to a local `127.0.0.1` or `localhost` go2rtc stream.
+
 #### Setup via the Add Camera Wizard
 
 The Add Camera Wizard is the recommended way to add a standard Reolink camera. Before starting, make sure [HTTP is enabled](https://support.reolink.com/articles/360003452893-How-to-Access-Reolink-Cameras-NVRs-Home-Hub-Locally-via-Web-Browsers/) in the camera's advanced network settings. The wizard uses the camera's HTTP API to determine its resolution and choose the recommended stream type from the table above.

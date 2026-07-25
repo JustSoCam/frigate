@@ -54,6 +54,7 @@ from frigate.data_processing.real_time.custom_classification import (
     CustomObjectClassificationProcessor,
     CustomStateClassificationProcessor,
 )
+from frigate.data_processing.real_time.external_face import ExternalFaceEnricher
 from frigate.data_processing.real_time.face import FaceRealTimeProcessor
 from frigate.data_processing.real_time.license_plate import (
     LicensePlateRealTimeProcessor,
@@ -150,6 +151,12 @@ class EmbeddingMaintainer(threading.Thread):
         self.event_metadata_subscriber = EventMetadataSubscriber(
             EventMetadataTypeEnum.regenerate_description
         )
+        self.external_face_start_subscriber = EventMetadataSubscriber(
+            EventMetadataTypeEnum.external_face_start
+        )
+        self.external_face_end_subscriber = EventMetadataSubscriber(
+            EventMetadataTypeEnum.external_face_end
+        )
         self.recordings_subscriber = RecordingsDataSubscriber(
             RecordingsDataTypeEnum.saved
         )
@@ -170,14 +177,15 @@ class EmbeddingMaintainer(threading.Thread):
 
         # realtime processors
         self.realtime_processors: list[RealTimeProcessorApi] = []
+        self.external_face_enricher: ExternalFaceEnricher | None = None
 
         if self.config.face_recognition.enabled:
             logger.debug("Face recognition enabled, initializing FaceRealTimeProcessor")
-            self.realtime_processors.append(
-                FaceRealTimeProcessor(
-                    self.config, self.requestor, self.event_metadata_publisher, metrics
-                )
+            face_processor = FaceRealTimeProcessor(
+                self.config, self.requestor, self.event_metadata_publisher, metrics
             )
+            self.realtime_processors.append(face_processor)
+            self.external_face_enricher = ExternalFaceEnricher(face_processor)
             logger.debug("FaceRealTimeProcessor initialized successfully")
 
         if self.config.classification.bird.enabled:
@@ -291,12 +299,15 @@ class EmbeddingMaintainer(threading.Thread):
             self._process_recordings_updates()
             self._process_review_updates()
             self._process_frame_updates()
+            self._process_external_face_events()
             self._process_deferred_results()
             self._expire_dedicated_lpr()
             self._process_finalized()
             self._process_event_metadata()
 
         # Shutdown deferred processors
+        if self.external_face_enricher is not None:
+            self.external_face_enricher.shutdown()
         for processor in self.realtime_processors:
             processor.shutdown()
 
@@ -308,6 +319,8 @@ class EmbeddingMaintainer(threading.Thread):
         self.detection_subscriber.stop()
         self.event_metadata_publisher.stop()
         self.event_metadata_subscriber.stop()
+        self.external_face_start_subscriber.stop()
+        self.external_face_end_subscriber.stop()
         self.embeddings_responder.stop()
         self.requestor.stop()
         logger.info("Exiting embeddings maintenance...")
@@ -695,6 +708,31 @@ class EmbeddingMaintainer(threading.Thread):
                             "force": force,
                         },
                     )
+
+    def _process_external_face_events(self) -> None:
+        """Handle face enrichment lifecycle for external person events."""
+        if self.external_face_enricher is None:
+            return
+
+        while True:
+            topic, payload = self.external_face_start_subscriber.check_for_update(
+                timeout=0
+            )
+            if topic is None:
+                break
+            event_id, camera, stream_name = payload
+            self.external_face_enricher.start(event_id, camera, stream_name)
+
+        while True:
+            topic, payload = self.external_face_end_subscriber.check_for_update(
+                timeout=0
+            )
+            if topic is None:
+                break
+            event_id, camera = payload
+            self.external_face_enricher.end(event_id, camera)
+
+        self.external_face_enricher.tick()
 
     def _process_frame_updates(self) -> None:
         """Process event updates"""
