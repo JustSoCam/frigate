@@ -1,11 +1,12 @@
 from concurrent.futures import Future
+from types import SimpleNamespace
 from unittest import TestCase
 
 import cv2
 import numpy as np
 
 from frigate.data_processing.real_time.external_face import (
-    CAPTURE_INTERVAL,
+    RECORDING_SETTLE_DELAY,
     ExternalFaceEnricher,
 )
 
@@ -39,43 +40,61 @@ class TestExternalFaceEnricher(TestCase):
         self.assertTrue(success)
         self.frame = encoded.tobytes()
 
-    def test_retries_main_stream_until_face_is_recognized(self):
+    def test_waits_for_event_end_then_retries_recordings_until_recognized(self):
         processor = FakeFaceProcessor([False, True])
-        streams = []
+        captures = []
         enricher = ExternalFaceEnricher(
+            SimpleNamespace(),
             processor,
-            capture_frame=lambda stream: streams.append(stream) or self.frame,
+            capture_frame=lambda camera, timestamp: captures.append((camera, timestamp))
+            or self.frame,
+            viewers_active=lambda: False,
             executor=ImmediateExecutor(),
             clock=lambda: self.now,
         )
 
-        enricher.start("event-1", "front", "front-main")
-        self.now += 1
+        enricher.start("event-1", "front", 10.0)
+        self.now += 20
+        enricher.tick()
+        self.assertEqual(captures, [])
+
+        enricher.end("event-1", "front", 24.0)
+        self.now += RECORDING_SETTLE_DELAY
         enricher.tick()
         enricher.tick()
-        self.now += CAPTURE_INTERVAL
         enricher.tick()
         enricher.tick()
 
-        self.assertEqual(streams, ["front-main", "front-main"])
+        self.assertEqual(len(captures), 2)
+        self.assertEqual(captures[0][0], "front")
         self.assertEqual(len(processor.processed), 2)
         self.assertNotIn("event-1", enricher.events)
         self.assertIn(("event-1", "front"), processor.expired)
 
-    def test_event_end_keeps_one_inflight_capture_but_stops_retries(self):
+    def test_live_viewer_pauses_face_work_after_event_end(self):
         processor = FakeFaceProcessor([False])
+        viewing = True
+        captures = []
         enricher = ExternalFaceEnricher(
+            SimpleNamespace(),
             processor,
-            capture_frame=lambda _stream: self.frame,
+            capture_frame=lambda camera, timestamp: captures.append((camera, timestamp))
+            or self.frame,
+            viewers_active=lambda: viewing,
             executor=ImmediateExecutor(),
             clock=lambda: self.now,
         )
 
-        enricher.start("event-1", "front", "front-main")
-        enricher.end("event-1", "front")
+        enricher.start("event-1", "front", 10.0)
+        enricher.end("event-1", "front", 20.0)
+        self.now += RECORDING_SETTLE_DELAY
         enricher.tick()
-        self.now += 10
+        self.assertEqual(captures, [])
+
+        viewing = False
+        self.now += 3
+        enricher.tick()
         enricher.tick()
 
         self.assertEqual(len(processor.processed), 1)
-        self.assertNotIn("event-1", enricher.events)
+        self.assertGreaterEqual(len(captures), 1)

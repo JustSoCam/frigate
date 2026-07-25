@@ -187,11 +187,12 @@ For cameras connected through an NVR, use the NVR address and credentials and se
 
 Reolink AI events contain a label and active/inactive state, but no reliable bounding box. They can create Review items, recordings, snapshots, MQTT events, and notifications; pixel-based zones and object paths still require Frigate object detection. Confirm the camera-side events are reliable for the installation before disabling Frigate detection on that camera.
 
-When face recognition is enabled, Reolink person events also use the camera's
-local go2rtc `record` restream for face detection and matching. This lets the
-main stream provide full-resolution face detail without enabling Frigate object
-detection or opening another connection to the camera. The `record` input must
-point to a local `127.0.0.1` or `localhost` go2rtc stream.
+When face recognition is enabled, Reolink person events are matched from
+full-resolution frames extracted from the camera's stored main-stream
+recording. Face work starts only after the alert ends, pauses while another
+alert or live viewer is active, and runs one frame at a time. This avoids
+opening another camera connection or competing with live playback. The
+`record` input must point to a local `127.0.0.1` or `localhost` go2rtc stream.
 
 #### Setup via the Add Camera Wizard
 

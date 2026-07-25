@@ -322,7 +322,7 @@ class ReolinkEventProvider(threading.Thread):
         if frigate_label == "person" and camera.face_stream:
             self._active_face_events.add(event_id)
             self._publisher.publish(
-                (event_id, camera.camera, camera.face_stream),
+                (event_id, camera.camera, now),
                 EventMetadataTypeEnum.external_face_start.value,
             )
         logger.info("Reolink AI event started for %s: %s", camera.camera, frigate_label)
@@ -331,14 +331,14 @@ class ReolinkEventProvider(threading.Thread):
         event_id = self._active_events.pop(key, None)
         if event_id is None or self._publisher is None:
             return
+        now = time.time()
         self._publisher.publish(
-            (event_id, time.time()),
-            EventMetadataTypeEnum.manual_event_end.value,
+            (event_id, now), EventMetadataTypeEnum.manual_event_end.value
         )
         if event_id in self._active_face_events:
             self._active_face_events.remove(event_id)
             self._publisher.publish(
-                (event_id, key[0]),
+                (event_id, key[0], now),
                 EventMetadataTypeEnum.external_face_end.value,
             )
         logger.info("Reolink AI event ended for %s: %s", key[0], key[1])

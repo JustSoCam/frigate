@@ -136,11 +136,13 @@ class TestReolinkEventProvider(TestCase):
             face_start_topic, EventMetadataTypeEnum.external_face_start.value
         )
         self.assertEqual(face_start_payload[0], create_payload[3])
-        self.assertEqual(face_start_payload[1:], ("front", "front-main"))
+        self.assertEqual(face_start_payload[1], "front")
+        self.assertEqual(face_start_payload[2], create_payload[0])
         self.assertEqual(end_topic, EventMetadataTypeEnum.manual_event_end.value)
         self.assertEqual(end_payload[0], create_payload[3])
         self.assertEqual(face_end_topic, EventMetadataTypeEnum.external_face_end.value)
-        self.assertEqual(face_end_payload, (create_payload[3], "front"))
+        self.assertEqual(face_end_payload[:2], (create_payload[3], "front"))
+        self.assertEqual(face_end_payload[2], end_payload[1])
         self.assertEqual(provider._active_events, {})
 
     def test_face_enrichment_requires_enabled_face_recognition_and_local_restream(self):

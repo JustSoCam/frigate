@@ -185,7 +185,9 @@ class EmbeddingMaintainer(threading.Thread):
                 self.config, self.requestor, self.event_metadata_publisher, metrics
             )
             self.realtime_processors.append(face_processor)
-            self.external_face_enricher = ExternalFaceEnricher(face_processor)
+            self.external_face_enricher = ExternalFaceEnricher(
+                self.config, face_processor
+            )
             logger.debug("FaceRealTimeProcessor initialized successfully")
 
         if self.config.classification.bird.enabled:
@@ -720,8 +722,8 @@ class EmbeddingMaintainer(threading.Thread):
             )
             if topic is None:
                 break
-            event_id, camera, stream_name = payload
-            self.external_face_enricher.start(event_id, camera, stream_name)
+            event_id, camera, start_time = payload
+            self.external_face_enricher.start(event_id, camera, start_time)
 
         while True:
             topic, payload = self.external_face_end_subscriber.check_for_update(
@@ -729,8 +731,8 @@ class EmbeddingMaintainer(threading.Thread):
             )
             if topic is None:
                 break
-            event_id, camera = payload
-            self.external_face_enricher.end(event_id, camera)
+            event_id, camera, end_time = payload
+            self.external_face_enricher.end(event_id, camera, end_time)
 
         self.external_face_enricher.tick()
 
